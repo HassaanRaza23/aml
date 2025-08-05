@@ -11,3 +11,18 @@
   @apply border border-gray-300 rounded px-3 py-2 w-full;
 }
 
+.input {
+  @apply border border-gray-300 rounded px-3 py-2 w-full;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-black px-4 py-2 rounded hover:bg-gray-300;
+}
+
+.btn-mini {
+  @apply text-blue-600 hover:underline text-sm;
+}

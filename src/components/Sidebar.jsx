@@ -20,6 +20,9 @@ const menu = [
     subMenu: [
       { title: 'Instant Screening', path: '/screening/instant' },
       { title: 'Ongoing Screening', path: '/screening/ongoing' },
+      
+      { title: 'Screening History', path: '/screening/screeninghistory' },
+      { title: 'Case Details', path: '/screening/casedetails' },
     ],
   },
   {

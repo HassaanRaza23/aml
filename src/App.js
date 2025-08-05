@@ -1,6 +1,7 @@
 // App.jsx
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+
 
 import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
@@ -17,6 +18,9 @@ import RiskProfile from './pages/Customer/RiskProfile';
 // Screening
 import InstantScreening from './pages/Screening/InstantScreening';
 import OngoingScreening from './pages/Screening/OngoingScreening';
+import MonitoringList from './pages/Screening/MonitoringList';
+import ScreeningHistory from './pages/Screening/ScreeningHistory';
+import CaseDetailView from './pages/Screening/CaseDetailView';
 
 // Monitoring
 import TransactionMonitoring from './pages/Monitoring/TransactionMonitoring';
@@ -42,6 +46,7 @@ import UserManagement from './pages/Admin/UserManagement';
 import RolePermissions from './pages/Admin/RolePermissions';
 import Settings from './pages/Admin/Settings';
 
+
 const App = () => {
   return (
     <Router>
@@ -66,6 +71,9 @@ const App = () => {
                 {/* Screening */}
                 <Route path="screening/instant" element={<InstantScreening />} />
                 <Route path="screening/ongoing" element={<OngoingScreening />} />
+                <Route path="/screening/monitoringlist" element={<MonitoringList />} />
+                <Route path="/screening/screeninghistory" element={<ScreeningHistory />} />
+                <Route path="/screening/casedetails" element={<CaseDetailView />} />
 
                 {/* Monitoring */}
                 <Route path="monitoring/transactions" element={<TransactionMonitoring />} />
