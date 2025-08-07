@@ -23,20 +23,26 @@ import ScreeningHistory from './pages/Screening/ScreeningHistory';
 import CaseDetailView from './pages/Screening/CaseDetailView';
 
 // Monitoring
+import AddTransaction from './pages/Monitoring/AddTransaction';
 import TransactionMonitoring from './pages/Monitoring/TransactionMonitoring';
 import Alerts from './pages/Monitoring/Alerts';
+import TransactionRules from './pages/Monitoring/TransactionRules';
 
 // Risk
 import RiskAssessment from './pages/Risk/RiskAssessment';
 import RiskRules from './pages/Risk/RiskRules';
 import RiskModels from './pages/Risk/RiskModels';
+import RiskProfile2 from './pages/Risk/RiskProfile2';
 
 // Case Management
 import CaseList from './pages/CaseManagement/CaseList';
 import CaseDetails from './pages/CaseManagement/CaseDetails';
 import AssignCase from './pages/CaseManagement/AssignCase';
+import CaseActions from './pages/CaseManagement/CaseActions';
 
 // Reports
+import ReportGeneration from './pages/Reports/ReportGeneration';
+import ReportList from './pages/Reports/ReportList';
 import SARReports from './pages/Reports/SARReports';
 import AuditLogs from './pages/Reports/AuditLogs';
 import ActivityReports from './pages/Reports/ActivityReports';
@@ -45,6 +51,10 @@ import ActivityReports from './pages/Reports/ActivityReports';
 import UserManagement from './pages/Admin/UserManagement';
 import RolePermissions from './pages/Admin/RolePermissions';
 import Settings from './pages/Admin/Settings';
+
+// Logs
+import ActivityLogs from './pages/logs/Activitylogs';
+import Systemlogs from './pages/logs/Systemlogs';
 
 
 const App = () => {
@@ -76,28 +86,39 @@ const App = () => {
                 <Route path="/screening/casedetails" element={<CaseDetailView />} />
 
                 {/* Monitoring */}
+                <Route path="monitoring/addtransactions" element={<AddTransaction />} />
                 <Route path="monitoring/transactions" element={<TransactionMonitoring />} />
                 <Route path="monitoring/alerts" element={<Alerts />} />
+                <Route path="monitoring/transactionrules" element={<TransactionRules />} />
 
                 {/* Risk */}
                 <Route path="risk/assessment" element={<RiskAssessment />} />
                 <Route path="risk/rules" element={<RiskRules />} />
                 <Route path="risk/models" element={<RiskModels />} />
+                <Route path="/risk-profile/:id" element={<RiskProfile2 />} />
+
 
                 {/* Case Management */}
                 <Route path="cases/list" element={<CaseList />} />
                 <Route path="cases/details" element={<CaseDetails />} />
                 <Route path="cases/assign" element={<AssignCase />} />
+                <Route path="cases/actions" element={<CaseActions />} />
 
                 {/* Reports */}
-                <Route path="reports/sar" element={<SARReports />} />
+                <Route path="reports/reportgeneration" element={<ReportGeneration />} />
+                <Route path="reports/reportlist" element={<ReportList />} />
+                {/* <Route path="reports/sar" element={<SARReports />} />
                 <Route path="reports/audit" element={<AuditLogs />} />
-                <Route path="reports/activity" element={<ActivityReports />} />
+                <Route path="reports/activity" element={<ActivityReports />} /> */}
 
                 {/* Admin */}
                 <Route path="admin/users" element={<UserManagement />} />
                 <Route path="admin/roles" element={<RolePermissions />} />
                 <Route path="admin/settings" element={<Settings />} />
+
+                {/* logs */}
+                <Route path="logs/activitylogs" element={<ActivityLogs />} />
+                <Route path="logs/systemlogs" element={<Systemlogs />} />
               </Routes>
             </Layout>
           }

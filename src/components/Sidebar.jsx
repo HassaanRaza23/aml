@@ -20,16 +20,18 @@ const menu = [
     subMenu: [
       { title: 'Instant Screening', path: '/screening/instant' },
       { title: 'Ongoing Screening', path: '/screening/ongoing' },
-      
-      { title: 'Screening History', path: '/screening/screeninghistory' },
-      { title: 'Case Details', path: '/screening/casedetails' },
+      // { title: 'Monitoring List', path: '/screening/monitoringlist' },
+      // { title: 'Screening History', path: '/screening/screeninghistory' },
+      // { title: 'Case Details', path: '/screening/casedetails' },
     ],
   },
   {
     title: 'Monitoring',
     subMenu: [
+      { title: 'Add Transactions', path: '/monitoring/addtransactions' },
       { title: 'Transaction Monitoring', path: '/monitoring/transactions' },
       { title: 'Alerts', path: '/monitoring/alerts' },
+      { title: 'Transaction Rules', path: '/monitoring/transactionrules' },
     ],
   },
   {
@@ -46,14 +48,17 @@ const menu = [
       { title: 'Case List', path: '/cases/list' },
       { title: 'Case Details', path: '/cases/details' },
       { title: 'Assign Case', path: '/cases/assign' },
+      { title: 'Case Actions', path: '/cases/actions' },
     ],
   },
   {
     title: 'Reports',
     subMenu: [
-      { title: 'SAR Reports', path: '/reports/sar' },
-      { title: 'Audit Logs', path: '/reports/audit' },
-      { title: 'Activity Reports', path: '/reports/activity' },
+      { title: 'Report Generation', path: '/reports/reportgeneration' },
+      { title: 'Report List', path: '/reports/reportlist' },
+      // { title: 'SAR Reports', path: '/reports/sar' },
+      // { title: 'Audit Logs', path: '/reports/audit' },
+      // { title: 'Activity Reports', path: '/reports/activity' },
     ],
   },
   {
@@ -62,6 +67,13 @@ const menu = [
       { title: 'User Management', path: '/admin/users' },
       { title: 'Role & Permissions', path: '/admin/roles' },
       { title: 'Settings', path: '/admin/settings' },
+    ],
+  },
+   {
+    title: 'logs',
+    subMenu: [
+      { title: 'Activity Logs', path: '/logs/activitylogs' },
+      { title: 'System Logs', path: '/logs/systemlogs' },
     ],
   },
 ];
