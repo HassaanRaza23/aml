@@ -1,6 +1,8 @@
 // App.jsx
 import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
 import Layout from './components/Layout';
@@ -75,8 +77,8 @@ const App = () => {
                 {/* Customer */}
                 <Route path="customer/list" element={<CustomerList />} />
                 <Route path="customer/onboarding" element={<CustomerForm />} />
-                <Route path="customer/kyc" element={<KYCDetails />} />
-                <Route path="customer/risk-profile" element={<RiskProfile />} />
+                <Route path="customer/kyc/:customerId" element={<KYCDetails />} />
+                <Route path="customer/risk-profile/:customerId" element={<RiskProfile />} />
 
                 {/* Screening */}
                 <Route path="screening/instant" element={<InstantScreening />} />
@@ -124,6 +126,17 @@ const App = () => {
           }
         />
       </Routes>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </Router>
   );
 };

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
+import { customerService } from "../../services/customerService";
+import { toast } from "react-toastify";
 
 const ReportGeneration = () => {
   const [reportType, setReportType] = useState("");
   const [format, setFormat] = useState("PDF");
   const [customer, setCustomer] = useState(null);
   const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [customersLoading, setCustomersLoading] = useState(true);
 
   // Dynamic Fields
   const [transactionId, setTransactionId] = useState("");
@@ -14,36 +18,83 @@ const ReportGeneration = () => {
   const [goamlType, setGoamlType] = useState("");
   const [submissionReason, setSubmissionReason] = useState("");
 
+  const fetchCustomers = async () => {
+    try {
+      setCustomersLoading(true);
+      const response = await customerService.getCustomers();
+      if (response.success) {
+        setCustomers(response.data || []);
+      } else {
+        toast.error("Failed to fetch customers");
+        setCustomers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      toast.error("Failed to fetch customers");
+      setCustomers([]);
+    } finally {
+      setCustomersLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Fetch customers
-    setCustomers([
-      { id: "cust001", name: "John Doe" },
-      { id: "cust002", name: "Jane Smith" }
-    ]);
+    fetchCustomers();
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      customerId: customer?.id,
-      customerName: customer?.name,
-      reportType,
-      format,
-      createdAt: new Date().toISOString(),
-      preparedBy: "CurrentUser", // replace with actual user
-      data: {}
-    };
-
-    if (reportType === "Suspicious Transaction Report") {
-      payload.data = { transactionId, suspicionReason };
-    } else if (reportType === "Screening Match Report") {
-      payload.data = { matchedEntity, matchDetails };
-    } else if (reportType === "goAML XML Report") {
-      payload.data = { goamlType, submissionReason };
+    
+    if (!customer) {
+      toast.error("Please select a customer");
+      return;
+    }
+    
+    if (!reportType) {
+      toast.error("Please select a report type");
+      return;
     }
 
-    console.log("Generated Report:", payload);
-    alert("Report generated successfully!");
+    setLoading(true);
+    
+    try {
+      const payload = {
+        customerId: customer.id,
+        customerName: `${customer.first_name} ${customer.last_name}`,
+        customerEmail: customer.email,
+        reportType,
+        format,
+        createdAt: new Date().toISOString(),
+        preparedBy: "CurrentUser", // replace with actual user
+        data: {}
+      };
+
+      if (reportType === "Suspicious Transaction Report") {
+        payload.data = { transactionId, suspicionReason };
+      } else if (reportType === "Screening Match Report") {
+        payload.data = { matchedEntity, matchDetails };
+      } else if (reportType === "goAML XML Report") {
+        payload.data = { goamlType, submissionReason };
+      }
+
+      console.log("Generated Report:", payload);
+      toast.success("Report generated successfully!");
+      
+      // Reset form
+      setCustomer(null);
+      setReportType("");
+      setTransactionId("");
+      setSuspicionReason("");
+      setMatchedEntity("");
+      setMatchDetails("");
+      setGoamlType("");
+      setSubmissionReason("");
+      
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast.error("Failed to generate report");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,10 +110,15 @@ const ReportGeneration = () => {
               const selected = customers.find((c) => c.id === e.target.value);
               setCustomer(selected);
             }}
+            disabled={customersLoading}
           >
-            <option value="">Select Customer</option>
+            <option value="">
+              {customersLoading ? "Loading customers..." : "Select Customer"}
+            </option>
             {customers.map((cust) => (
-              <option key={cust.id} value={cust.id}>{cust.name}</option>
+              <option key={cust.id} value={cust.id}>
+                {cust.first_name} {cust.last_name} - {cust.email}
+              </option>
             ))}
           </select>
         </div>
@@ -162,8 +218,14 @@ const ReportGeneration = () => {
           </select>
         </div>
 
-        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
-          Generate Report
+        <button 
+          type="submit" 
+          className={`px-4 py-2 text-white rounded ${
+            loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+          disabled={loading}
+        >
+          {loading ? "Generating..." : "Generate Report"}
         </button>
       </form>
     </div>

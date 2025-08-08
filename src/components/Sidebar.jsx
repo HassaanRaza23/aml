@@ -11,8 +11,8 @@ const menu = [
     subMenu: [
       { title: 'Customer List', path: '/customer/list' },
       { title: 'Onboarding Form', path: '/customer/onboarding' },
-      { title: 'KYC Details', path: '/customer/kyc' },
-      { title: 'Risk Profile', path: '/customer/risk-profile' },
+      // { title: 'KYC Details', path: '/customer/kyc' },
+      // { title: 'Risk Profile', path: '/customer/risk-profile' },
     ],
   },
   {
@@ -39,7 +39,7 @@ const menu = [
     subMenu: [
       { title: 'Risk Assessment', path: '/risk/assessment' },
       { title: 'Risk Rules', path: '/risk/rules' },
-      { title: 'Risk Models', path: '/risk/models' },
+      // { title: 'Risk Models', path: '/risk/models' },
     ],
   },
   {
@@ -47,7 +47,7 @@ const menu = [
     subMenu: [
       { title: 'Case List', path: '/cases/list' },
       { title: 'Case Details', path: '/cases/details' },
-      { title: 'Assign Case', path: '/cases/assign' },
+      // { title: 'Assign Case', path: '/cases/assign' },
       { title: 'Case Actions', path: '/cases/actions' },
     ],
   },
@@ -61,14 +61,14 @@ const menu = [
       // { title: 'Activity Reports', path: '/reports/activity' },
     ],
   },
-  {
-    title: 'Admin',
-    subMenu: [
-      { title: 'User Management', path: '/admin/users' },
-      { title: 'Role & Permissions', path: '/admin/roles' },
-      { title: 'Settings', path: '/admin/settings' },
-    ],
-  },
+  // {
+  //   title: 'Admin',
+  //   subMenu: [
+  //     { title: 'User Management', path: '/admin/users' },
+  //     { title: 'Role & Permissions', path: '/admin/roles' },
+  //     { title: 'Settings', path: '/admin/settings' },
+  //   ],
+  // },
    {
     title: 'logs',
     subMenu: [
