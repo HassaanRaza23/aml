@@ -502,7 +502,7 @@ const Alerts = () => {
       {/* Alerts Table */}
       {!loading && !error && (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
+      <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -537,10 +537,10 @@ const Alerts = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
-                </tr>
-              </thead>
+            </tr>
+          </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {alerts.map((alert) => (
+            {alerts.map((alert) => (
                   <tr key={alert.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
@@ -570,8 +570,8 @@ const Alerts = () => {
                         'bg-green-100 text-green-800'
                       }`}>
                         {alert.severity}
-                      </span>
-                    </td>
+                  </span>
+                </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         alert.status === 'Open' ? 'bg-red-100 text-red-800' :
@@ -582,24 +582,24 @@ const Alerts = () => {
                         {alert.status === 'Open' && <ExclamationTriangleIcon className="w-3 h-3 mr-1" />}
                         {alert.status === 'Resolved' && <CheckCircleIcon className="w-3 h-3 mr-1" />}
                         {alert.status === 'In Progress' && <ClockIcon className="w-3 h-3 mr-1" />}
-                        {alert.status}
-                      </span>
-                    </td>
+                    {alert.status}
+                  </span>
+                </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
+                  <button
                         onClick={() => viewAlert(alert.id)}
                         className="text-blue-600 hover:text-blue-900 transition-colors flex items-center gap-1"
                         title="View Details"
                       >
                         <EyeIcon className="w-4 h-4" />
                         View Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
           {/* Empty State */}
           {alerts.length === 0 && !loading && (
@@ -815,13 +815,13 @@ const Alerts = () => {
               >
                 Cancel
               </button>
-              <button
+                <button
                 onClick={updateAlertStatus}
                 disabled={!modalStatus}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+                >
                 Save Changes
-              </button>
+                </button>
             </div>
           </div>
         </div>

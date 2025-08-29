@@ -43,6 +43,37 @@ export const transactionProducts = [
   "Secondary property", "PLATINUM"
 ];
 
+// Legal Entity specific dropdown options
+export const businessActivities = [
+  "Trading", "Manufacturing", "Services", "Real Estate", "Financial Services",
+  "Technology", "Healthcare", "Education", "Consulting", "Retail", "Wholesale",
+  "Construction", "Transportation", "Hospitality", "Agriculture", "Mining",
+  "Energy", "Media", "Entertainment", "Other"
+];
+
+export const licenseTypes = [
+  "Commercial License", "Industrial License", "Professional License", 
+  "Civil Organization License", "Service License", "Trading License", 
+  "Business License", "Certificate of Incorporation"
+];
+
+export const licenseCategories = [
+  "Category A", "Category B", "Category C", "Category D", "Category E",
+  "Special Category", "General Category", "Professional Category"
+];
+
+export const jurisdictions = [
+  "UAE", "Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Umm Al Quwain",
+  "Ras Al Khaimah", "Fujairah", "Free Zone", "Offshore", "Other"
+];
+
+// Additional dropdown options for shareholders (existing)
+export const entityTypes = ["Natural Person", "Legal Entities", "Trust"];
+export const entityClassTypes = ["Class A", "Class B"];
+export const trustTypes = ["Discretionary", "Charitable", "Purpose"];
+export const trusteeTypes = ["Natural Person", "Legal Entities"];
+export const yesNoOptions = ["Yes", "No"];
+
 // Imports from other files
 export { countries } from "./countries";        // Includes name, code, phone
 export { occupations } from "./occupations";    // Large occupation list // Optional phone-only country list

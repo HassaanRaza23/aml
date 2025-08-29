@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { customerService } from "../../services";
 import OnboardingForm from "./OnboardingForm";
 
@@ -15,6 +16,9 @@ const CustomerList = () => {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const handleSort = (field) => {
     setSortBy((prev) => (prev === field ? "" : field));
@@ -58,13 +62,13 @@ const CustomerList = () => {
         if (refreshResult.success) {
           setCustomers(refreshResult.data);
         }
-        alert(`✅ ${result.message}\nUpdated: ${result.updatedCount} customers\nErrors: ${result.errorCount}`);
+        toast.success(`✅ ${result.message}\nUpdated: ${result.updatedCount} customers\nErrors: ${result.errorCount}`);
       } else {
-        alert(`❌ Error: ${result.error}`);
+        toast.error(`❌ Error: ${result.error}`);
       }
     } catch (error) {
       console.error('Error re-evaluating risk scores:', error);
-      alert('❌ Failed to re-evaluate risk scores');
+      toast.error('❌ Failed to re-evaluate risk scores');
     } finally {
       setReEvaluating(false);
     }
@@ -84,12 +88,211 @@ const CustomerList = () => {
   };
 
   // Handle edit customer
-  const handleEdit = (customer) => {
-    // Find the original customer data from the database
-    const originalCustomer = customers.find(c => c.id === customer.id);
-    setSelectedCustomer(originalCustomer);
-    setShowEditModal(true);
-    setExpandedRows(new Set()); // Close expansion
+  const handleEdit = async (customer) => {
+    try {
+      // Fetch all related data for this customer including expandable sections
+      const fullCustomerData = await customerService.getCustomerById(customer.id);
+      
+      if (!fullCustomerData) {
+        console.error('Failed to fetch customer data for editing');
+        return;
+      }
+      
+      console.log('🔍 Full customer data for editing:', fullCustomerData);
+      
+      // Flatten the normalized data to match the old form structure
+      const flattenedCustomer = {
+        // Core customer fields (from customers table)
+        id: fullCustomerData.id,
+        core_system_id: fullCustomerData.core_system_id,
+        customer_type: fullCustomerData.customer_type,
+        email: fullCustomerData.email,
+        phone: fullCustomerData.phone,
+        channel: fullCustomerData.channel,
+        transaction_product: fullCustomerData.transaction_product,
+        transaction_amount_limit: fullCustomerData.transaction_amount_limit,
+        transaction_limit: fullCustomerData.transaction_limit,
+        risk_score: fullCustomerData.risk_score,
+        risk_level: fullCustomerData.risk_level,
+        kyc_status: fullCustomerData.kyc_status,
+        kyc_remarks: fullCustomerData.kyc_remarks,
+        due_diligence_level: fullCustomerData.due_diligence_level,
+        status: fullCustomerData.status,
+        created_at: fullCustomerData.created_at,
+        updated_at: fullCustomerData.updated_at,
+        
+        // Flatten natural person details
+        ...(fullCustomerData.natural_person_details && {
+          profession: fullCustomerData.natural_person_details.profession,
+          firstname: fullCustomerData.natural_person_details.firstname,
+          lastname: fullCustomerData.natural_person_details.lastname,
+          alias: fullCustomerData.natural_person_details.alias,
+          dateofbirth: fullCustomerData.natural_person_details.dateofbirth,
+          nationality: fullCustomerData.natural_person_details.nationality,
+          residencystatus: fullCustomerData.natural_person_details.residencystatus,
+          idtype: fullCustomerData.natural_person_details.idtype,
+          idnumber: fullCustomerData.natural_person_details.idnumber,
+          issuedate: fullCustomerData.natural_person_details.issuedate,
+          expirydate: fullCustomerData.natural_person_details.expirydate,
+          isdualnationality: fullCustomerData.natural_person_details.isdualnationality,
+          dualnationality: fullCustomerData.natural_person_details.dualinationality,
+          dualpassportnumber: fullCustomerData.natural_person_details.dualpassportnumber,
+          dualpassportissuedate: fullCustomerData.natural_person_details.dualpassportissuedate,
+          dualpassportexpirydate: fullCustomerData.natural_person_details.dualpassportexpirydate,
+          countryofbirth: fullCustomerData.natural_person_details.countryofbirth,
+          address: fullCustomerData.natural_person_details.address,
+          city: fullCustomerData.natural_person_details.city,
+          occupation: fullCustomerData.natural_person_details.occupation,
+          sourceofwealth: fullCustomerData.natural_person_details.sourceofwealth,
+          pep: fullCustomerData.natural_person_details.pep,
+          sourceoffunds: fullCustomerData.natural_person_details.sourceoffunds,
+          pobox: fullCustomerData.natural_person_details.pobox,
+          gender: fullCustomerData.natural_person_details.gender,
+          employer: fullCustomerData.natural_person_details.employer
+        }),
+        
+        // Flatten legal entity details
+        ...(fullCustomerData.legal_entity_details && {
+          businessactivity: fullCustomerData.legal_entity_details.businessactivity ? 
+            (typeof fullCustomerData.legal_entity_details.businessactivity === 'string' ? 
+              JSON.parse(fullCustomerData.legal_entity_details.businessactivity) : 
+              fullCustomerData.legal_entity_details.businessactivity) : [],
+          legalname: fullCustomerData.legal_entity_details.legalname,
+          alias: fullCustomerData.legal_entity_details.alias,
+          dateofincorporation: fullCustomerData.legal_entity_details.dateofincorporation,
+          countryofincorporation: fullCustomerData.legal_entity_details.countryofincorporation,
+          licensetype: fullCustomerData.legal_entity_details.licensetype,
+          licensenumber: fullCustomerData.legal_entity_details.licensenumber,
+          licenseissuedate: fullCustomerData.legal_entity_details.licenseissuedate,
+          licenseexpirydate: fullCustomerData.legal_entity_details.licenseexpirydate,
+          registeredofficeaddress: fullCustomerData.legal_entity_details.registeredofficeaddress,
+          city: fullCustomerData.legal_entity_details.city,
+          countriessourceoffunds: fullCustomerData.legal_entity_details.countriessourceoffunds ? 
+            (typeof fullCustomerData.legal_entity_details.countriessourceoffunds === 'string' ? 
+              JSON.parse(fullCustomerData.legal_entity_details.countriessourceoffunds) : 
+              fullCustomerData.legal_entity_details.countriessourceoffunds) : [],
+          managementcompany: fullCustomerData.legal_entity_details.managementcompany,
+          countriesofoperation: fullCustomerData.legal_entity_details.countriesofoperation ? 
+            (typeof fullCustomerData.legal_entity_details.countriesofoperation === 'string' ? 
+              JSON.parse(fullCustomerData.legal_entity_details.countriesofoperation) : 
+              fullCustomerData.legal_entity_details.countriesofoperation) : [],
+          jurisdiction: fullCustomerData.legal_entity_details.jurisdiction,
+          sourceoffunds: fullCustomerData.legal_entity_details.sourceoffunds,
+          residencystatus: fullCustomerData.legal_entity_details.residencystatus,
+          licensingauthority: fullCustomerData.legal_entity_details.licensingauthority,
+          trn: fullCustomerData.legal_entity_details.trn,
+          licensecategory: fullCustomerData.legal_entity_details.licensecategory,
+          addressexpirydate: fullCustomerData.legal_entity_details.addressexpirydate
+        }),
+        
+        // Expandable sections - transform field names from snake_case to camelCase
+        shareholders: (fullCustomerData.shareholders || []).map(shareholder => ({
+          // Preserve the ID for editing
+          id: shareholder.id,
+          // Map the new normalized structure to the expected frontend format
+          type: shareholder.type,
+          fullName: shareholder.fullName,
+          alias: shareholder.alias,
+          nationality: shareholder.nationality,
+          countryOfResidence: shareholder.countryOfResidence,
+          dateOfBirth: shareholder.dateOfBirth,
+          placeOfBirth: shareholder.placeOfBirth,
+          phone: shareholder.phone,
+          email: shareholder.email,
+          address: shareholder.address,
+          sourceOfFunds: shareholder.sourceOfFunds,
+          sourceOfWealth: shareholder.sourceOfWealth,
+          occupation: shareholder.occupation,
+          expectedIncome: shareholder.expectedIncome,
+          pep: shareholder.pep,
+          shareholding: shareholder.shareholding,
+          dualNationality: shareholder.dualNationality,
+          isDirector: shareholder.isDirector,
+          isUbo: shareholder.isUbo,
+          // Legal Entity fields
+          legalName: shareholder.legalName,
+          dateOfIncorporation: shareholder.dateOfIncorporation,
+          countryOfIncorporation: shareholder.countryOfIncorporation,
+          entityClass: shareholder.entityClass,
+          licenseType: shareholder.licenseType,
+          licenseNumber: shareholder.licenseNumber,
+          licenseIssueDate: shareholder.licenseIssueDate,
+          licenseExpiryDate: shareholder.licenseExpiryDate,
+          businessActivity: shareholder.businessActivity,
+          countriesOfOperation: shareholder.countriesOfOperation,
+          registeredOfficeAddress: shareholder.registeredOfficeAddress,
+          countriesSourceOfFunds: shareholder.countriesSourceOfFunds,
+          otherDetails: shareholder.otherDetails,
+          // Trust fields
+          trustName: shareholder.trustName,
+          trustRegistered: shareholder.trustRegistered,
+          trustType: shareholder.trustType,
+          jurisdictionOfLaw: shareholder.jurisdictionOfLaw,
+          registeredAddress: shareholder.registeredAddress,
+          trusteeName: shareholder.trusteeName,
+          trusteeType: shareholder.trusteeType
+        })),
+        directors: (fullCustomerData.customer_directors || []).map(director => ({
+          firstName: director.first_name,
+          alias: director.alias,
+          lastName: director.last_name,
+          countryOfResidence: director.country_of_residence,
+          nationality: director.nationality,
+          dateOfBirth: director.date_of_birth,
+          phone: director.phone,
+          placeOfBirth: director.place_of_birth,
+          email: director.email,
+          address: director.address,
+          city: director.city,
+          occupation: director.occupation,
+          pepStatus: director.pep_status,
+          isCeo: director.is_ceo,
+          isRepresentative: director.is_representative,
+          dualNationality: director.dual_nationality
+        })),
+        bankDetails: (fullCustomerData.customer_bank_details || []).map(bank => ({
+          bankName: bank.bank_name,
+          alias: bank.alias,
+          accountType: bank.account_type,
+          currency: bank.currency,
+          bankAccountDetails: bank.bank_account_details,
+          accountNumber: bank.account_number,
+          iban: bank.iban,
+          swift: bank.swift,
+          modeOfSignatory: bank.mode_of_signatory,
+          internetBanking: bank.internet_banking,
+          bankSignatories: bank.bank_signatories
+        })),
+        ubos: (fullCustomerData.ubos || []).map(ubo => ({
+          id: ubo.id,
+          fullName: ubo.fullName,
+          alias: ubo.alias,
+          nationality: ubo.nationality,
+          countryOfResidence: ubo.countryOfResidence,
+          dateOfBirth: ubo.dateOfBirth,
+          placeOfBirth: ubo.placeOfBirth,
+          phone: ubo.phone,
+          email: ubo.email,
+          address: ubo.address,
+          sourceOfFunds: ubo.sourceOfFunds,
+          sourceOfWealth: ubo.sourceOfWealth,
+          occupation: ubo.occupation,
+          expectedIncome: ubo.expectedIncome,
+          pep: ubo.pep,
+          shareholding: ubo.shareholding,
+          dualNationality: ubo.dualNationality
+        }))
+      };
+      
+      console.log('✅ Flattened customer data for editing:', flattenedCustomer);
+      
+      setSelectedCustomer(flattenedCustomer);
+      setShowEditModal(true);
+      setExpandedRows(new Set()); // Close expansion
+    } catch (error) {
+      console.error('Error preparing customer data for editing:', error);
+      toast.error('Failed to load customer data for editing. Please try again.');
+    }
   };
 
   // Handle KYC review
@@ -132,22 +335,94 @@ const CustomerList = () => {
     }
   };
 
+  // Handle delete customer
+  const handleDeleteCustomer = async () => {
+    if (!customerToDelete) return;
+    
+    try {
+      setDeleting(true);
+      const result = await customerService.deleteCustomer(customerToDelete.id);
+      
+      if (result.success) {
+        // Refresh the customer list
+        const refreshResult = await customerService.getCustomers();
+        if (refreshResult.success) {
+          setCustomers(refreshResult.data);
+        }
+        
+        // Close modal and show success message
+        setShowDeleteModal(false);
+        setCustomerToDelete(null);
+        toast.success('Customer deleted successfully!');
+      } else {
+        toast.error(`❌ Error: ${result.error || 'Failed to delete customer'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      toast.error(`❌ Error: ${error.message || 'Failed to delete customer'}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Show delete confirmation modal
+  const showDeleteConfirmation = (customer) => {
+    setCustomerToDelete(customer);
+    setShowDeleteModal(true);
+  };
+
   // Transform customer data for display
   const transformCustomerData = (customer) => {
-    const fullName = customer.customer_type === 'Natural Person' 
-      ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
-      : customer.first_name || customer.alias || 'Legal Entity';
+    console.log('🔍 Transforming customer:', customer);
+    console.log('📋 Customer type:', customer.customer_type);
+    console.log('👤 Natural person details:', customer.natural_person_details);
+    console.log('🏢 Legal entity details:', customer.legal_entity_details);
+    console.log('🔍 Customer type comparison:', {
+      isNaturalPerson: customer.customer_type === 'Natural Person',
+      isLegalEntities: customer.customer_type === 'Legal Entities',
+      hasNaturalPersonDetails: !!customer.natural_person_details,
+      hasLegalEntityDetails: !!customer.legal_entity_details
+    });
     
-    return {
+    let fullName = 'Unnamed Customer';
+    
+    if (customer.customer_type === 'Natural Person' && customer.natural_person_details) {
+      const firstName = customer.natural_person_details.firstname || '';
+      const lastName = customer.natural_person_details.lastname || '';
+      fullName = `${firstName} ${lastName}`.trim();
+      console.log('👤 Natural person name:', fullName);
+    } else if (customer.customer_type === 'Legal Entities' && customer.legal_entity_details) {
+      fullName = customer.legal_entity_details.legalname || 'Legal Entity';
+      console.log('🏢 Legal entity name:', fullName);
+    }
+    
+    // If still unnamed, try to get name from other fields
+    if (fullName === 'Unnamed Customer' || fullName.trim() === '') {
+      if (customer.first_name && customer.last_name) {
+        fullName = `${customer.first_name} ${customer.last_name}`.trim();
+        console.log('🔍 Fallback to old fields:', fullName);
+      } else if (customer.first_name) {
+        fullName = customer.first_name;
+        console.log('🔍 Fallback to first_name only:', fullName);
+      } else if (customer.alias) {
+        fullName = customer.alias;
+        console.log('🔍 Fallback to alias:', fullName);
+      }
+    }
+    
+    const result = {
       id: customer.id,
       name: fullName || 'Unnamed Customer',
+      customer_type: customer.customer_type,
       risk: customer.risk_level || 'Low',
       kyc: customer.kyc_status || 'Pending',
       date: customer.created_at ? new Date(customer.created_at).toISOString().split('T')[0] : 'N/A',
-      customer_type: customer.customer_type,
       email: customer.email,
       phone: customer.phone
     };
+    
+    console.log('✅ Final result:', result);
+    return result;
   };
 
   const filtered = customers
@@ -267,7 +542,7 @@ const CustomerList = () => {
       {/* Table */}
       {!loading && !error && (
         <div className="overflow-auto bg-white rounded-xl shadow border">
-        <table className="min-w-full text-sm text-left">
+          <table className="min-w-full text-sm text-left">
           <thead>
             <tr className="bg-gray-100 text-gray-700 border-b">
               <th
@@ -275,6 +550,12 @@ const CustomerList = () => {
                 onClick={() => handleSort("name")}
               >
                 Name
+              </th>
+              <th
+                className="p-4 font-medium cursor-pointer hover:text-blue-600"
+                onClick={() => handleSort("customer_type")}
+              >
+                Type
               </th>
               <th
                 className="p-4 font-medium cursor-pointer hover:text-blue-600"
@@ -308,6 +589,11 @@ const CustomerList = () => {
                 >
                   <td className="p-4 font-semibold text-gray-800">{cust.name}</td>
                   <td className="p-4">
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                      {cust.customer_type}
+                    </span>
+                  </td>
+                  <td className="p-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         cust.risk === "High"
@@ -327,7 +613,7 @@ const CustomerList = () => {
                 {/* Expanded Actions Row */}
                 {expandedRows.has(cust.id) && (
                   <tr className="bg-gray-50 border-b">
-                    <td colSpan="4" className="p-4">
+                    <td colSpan="5" className="p-4">
                       <div className="flex gap-3">
                         <button
                           onClick={(e) => {
@@ -355,6 +641,15 @@ const CustomerList = () => {
                           className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
                         >
                           Risk Profile
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showDeleteConfirmation(cust);
+                          }}
+                          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
+                        >
+                          Delete Customer
                         </button>
                         <button
                           onClick={(e) => {
@@ -413,6 +708,65 @@ const CustomerList = () => {
                   setSelectedCustomer(null);
                 }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && customerToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-medium text-gray-900">Delete Customer</h3>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-sm text-gray-600">
+                Are you sure you want to delete <span className="font-semibold text-gray-900">{customerToDelete.name}</span>?
+              </p>
+              <p className="text-sm text-red-600 mt-2">
+                ⚠️ This action cannot be undone.
+              </p>
+            </div>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setCustomerToDelete(null);
+                }}
+                disabled={deleting}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg font-medium transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteCustomer}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
