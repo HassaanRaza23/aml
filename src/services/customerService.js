@@ -1411,6 +1411,97 @@ export const customerService = {
     }
   },
 
+  // Get natural person details by customer ID
+  getNaturalPersonDetails: async (customerId) => {
+    try {
+      console.log('🔍 Fetching natural person details for customer:', customerId)
+      
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        // Mock implementation
+        console.log('🔧 Using mock natural person details fetch (Supabase not configured)')
+        await new Promise(resolve => setTimeout(resolve, 500))
+        return {
+          firstname: 'John',
+          lastname: 'Doe',
+          nationality: 'US',
+          profession: 'Engineer',
+          idtype: 'Passport',
+          idnumber: '123456789',
+          sourceofwealth: 'Employment',
+          sourceoffunds: 'Salary',
+          pep: 'No',
+          residencystatus: 'Resident',
+          gender: 'Male'
+        }
+      }
+      
+      // Real Supabase implementation
+      const { data, error } = await supabase
+        .from('natural_person_details')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single()
+      
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No data found
+          console.log('🔍 No natural person details found for customer:', customerId)
+          return null
+        }
+        throw new Error(error.message)
+      }
+      
+      console.log('🔍 Natural person details fetched:', data)
+      return data
+    } catch (error) {
+      console.error('Error fetching natural person details:', error)
+      return null
+    }
+  },
+
+  // Get legal entity details by customer ID
+  getLegalEntityDetails: async (customerId) => {
+    try {
+      console.log('🔍 Fetching legal entity details for customer:', customerId)
+      
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        // Mock implementation
+        console.log('🔧 Using mock legal entity details fetch (Supabase not configured)')
+        await new Promise(resolve => setTimeout(resolve, 500))
+        return {
+          legalname: 'Acme Corp',
+          alias: 'ACME',
+          jurisdiction: 'US',
+          businessactivity: 'Technology',
+          sourceoffunds: 'Business Operations',
+          residencystatus: 'Domestic'
+        }
+      }
+      
+      // Real Supabase implementation
+      const { data, error } = await supabase
+        .from('legal_entity_details')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single()
+      
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No data found
+          console.log('🔍 No legal entity details found for customer:', customerId)
+          return null
+        }
+        throw new Error(error.message)
+      }
+      
+      console.log('🔍 Legal entity details fetched:', data)
+      return data
+    } catch (error) {
+      console.error('Error fetching legal entity details:', error)
+      return null
+    }
+  },
+
   // Get a single shareholder by ID from normalized structure
   getShareholderById: async (shareholderId) => {
     try {
@@ -2259,6 +2350,56 @@ export const customerService = {
       return { 
         success: false, 
         error: error.message || 'Failed to save bank details'
+      }
+    }
+  },
+
+  // Get bank details by customer ID
+  getBankDetails: async (customerId) => {
+    try {
+      console.log('🏦 Fetching bank details for customer:', customerId)
+      
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        // Mock implementation
+        console.log('🔧 Using mock bank details fetch (Supabase not configured)')
+        await new Promise(resolve => setTimeout(resolve, 500))
+        return {
+          success: true,
+          data: [
+            {
+              bank_name: 'Mock Bank',
+              account_type: 'Savings',
+              currency: 'USD',
+              account_number: '1234567890',
+              iban: 'US12345678901234567890',
+              swift: 'MOCKUS33',
+              mode_of_signatory: 'Single',
+              internet_banking: true
+            }
+          ]
+        }
+      }
+      
+      // Real Supabase implementation
+      const { data, error } = await supabase
+        .from('customer_bank_details')
+        .select('*')
+        .eq('customer_id', customerId)
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      
+      console.log('🏦 Bank details fetched:', data)
+      return { 
+        success: true, 
+        data: data || []
+      }
+    } catch (error) {
+      console.error('Error fetching bank details:', error)
+      return { 
+        success: false, 
+        error: error.message || 'Failed to fetch bank details'
       }
     }
   },
