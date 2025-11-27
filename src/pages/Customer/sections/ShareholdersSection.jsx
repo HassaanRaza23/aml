@@ -3,13 +3,16 @@ import { countries } from "../../../data/countries";
 import { occupations } from "../../../data/occupations";
 import {
   entityTypes,
+  businessActivities,
   entityClassTypes,
+  licenseTypes,
   trustTypes,
   trusteeTypes,
   yesNoOptions,
   sourceOfWealth,
   sourceOfFunds,
-  pepOptions
+  pepOptions,
+  idTypes
 } from "../../../data/dropdownOptions";
 import { customerService } from "../../../services/customerService";
 
@@ -54,6 +57,15 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
     nationality: "",
     dateOfBirth: "",
     placeOfBirth: "",
+    idType: "",
+    idNumber: "",
+    idIssueDate: "",
+    idExpiryDate: "",
+    isDualNationality: false,
+    dualNationality: "",
+    dualPassportNumber: "",
+    dualPassportIssueDate: "",
+    dualPassportExpiryDate: "",
     countryCode: "+971",
     phone: "",
     email: "",
@@ -64,7 +76,6 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
     expectedIncome: "",
     pep: "",
     shareholding: "",
-    dualNationality: "",
     isDirector: false,
     isUbo: false
   });
@@ -147,6 +158,32 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           error = "Trust name must be at least 2 characters long";
         }
         break;
+      case "dualNationality":
+      case "dualPassportNumber":
+      case "dualPassportIssueDate":
+      case "dualPassportExpiryDate":
+        if (currentShareholder.isDualNationality) {
+          if (!value) {
+            error = "This field is required";
+          } else if (
+            (name === "dualPassportIssueDate" || name === "dualPassportExpiryDate") &&
+            value
+          ) {
+            const dateValue = new Date(value);
+            const today = new Date();
+            // Clear time for date-only comparison
+            today.setHours(0, 0, 0, 0);
+            dateValue.setHours(0, 0, 0, 0);
+            
+            if (name === "dualPassportIssueDate" && dateValue > today) {
+              error = "Issue date cannot be in the future";
+            }
+            if (name === "dualPassportExpiryDate" && dateValue < today) {
+              error = "Expiry date cannot be in the past";
+            }
+          }
+        }
+        break;
     }
     
     return error;
@@ -225,7 +262,7 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
         onShareholdersChange([...shareholders, newShareholder]);
       }
       
-            // If this shareholder is also a director, fill the director form fields
+      // If this shareholder is also a director, fill the director form fields
       if (newShareholder.isDirector && onDirectorCreate && shareholderType === "Natural Person") {
         const directorData = {
           firstName: newShareholder.fullName ? newShareholder.fullName.split(' ')[0] : '',
@@ -235,6 +272,14 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           nationality: newShareholder.nationality || '',
           dateOfBirth: newShareholder.dateOfBirth || '',
           placeOfBirth: newShareholder.placeOfBirth || '',
+          isDualNationality: newShareholder.isDualNationality|| '',
+          dualPassportNumber: newShareholder.dualPassportNumber|| '',
+          dualPassportIssueDate: newShareholder.dualPassportIssueDate|| '',
+          dualPassportExpiryDate: newShareholder.dualPassportExpiryDate|| '',
+          idType: newShareholder.idType|| '',
+          idNumber: newShareholder.idNumber|| '',
+          idIssueDate: newShareholder.idIssueDate|| '',
+          idExpiryDate: newShareholder.idExpiryDate|| '',
           phone: newShareholder.phone || '',
           email: newShareholder.email || '',
           address: newShareholder.address || '',
@@ -259,6 +304,14 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           nationality: newShareholder.nationality || '',
           dateOfBirth: newShareholder.dateOfBirth || '',
           placeOfBirth: newShareholder.placeOfBirth || '',
+          isDualNationality: newShareholder.isDualNationality|| '',
+          dualPassportNumber: newShareholder.dualPassportNumber|| '',
+          dualPassportIssueDate: newShareholder.dualPassportIssueDate|| '',
+          dualPassportExpiryDate: newShareholder.dualPassportExpiryDate|| '',
+          idType: newShareholder.idType|| '',
+          idNumber: newShareholder.idNumber|| '',
+          idIssueDate: newShareholder.idIssueDate|| '',
+          idExpiryDate: newShareholder.idExpiryDate|| '',
           phone: newShareholder.phone || '',
           email: newShareholder.email || '',
           address: newShareholder.address || '',
@@ -285,6 +338,14 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           nationality: "",
           dateOfBirth: "",
           placeOfBirth: "",
+          idType: "",
+          idNumber: "",
+          idIssueDate: "",
+          idExpiryDate: "",
+          isDualNationality: false,
+          dualPassportNumber: "",
+          dualPassportIssueDate: "",
+          dualPassportExpiryDate: "",
           countryCode: "+971",
           phone: "",
           email: "",
@@ -479,6 +540,10 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
       nationality: "",
       dateOfBirth: "",
       placeOfBirth: "",
+      idType: "",
+      idNumber: "",
+      idIssueDate: "",
+      idExpiryDate: "",
       countryCode: "+971",
       phone: "",
       email: "",
@@ -489,14 +554,81 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
       expectedIncome: "",
       pep: "",
       shareholding: "",
-      dualNationality: "",
       isDirector: false,
-        isUbo: false
+      isUbo: false,
+      isDualNationality: false,
+      dualNationality: "",
+      dualPassportNumber: "",
+      dualPassportIssueDate: "",
+      dualPassportExpiryDate: ""
     });
     setErrors({});
     setTouched({});
     setShowAddForm(false);
   };
+  // Add item to multi-select
+const addToMultiSelect = (field, item) => {
+  const currentValues = currentShareholder[field] || [];
+  if (!currentValues.includes(item)) {
+    setCurrentShareholder(prev => ({
+      ...prev,
+      [field]: [...currentValues, item]
+    }));
+  }
+};
+
+// Remove item from multi-select
+const removeFromMultiSelect = (field, item) => {
+  const currentValues = currentShareholder[field] || [];
+  setCurrentShareholder(prev => ({
+    ...prev,
+    [field]: currentValues.filter(value => value !== item)
+  }));
+};
+
+// Render multi-select UI
+const renderMultiSelect = (field, options, placeholder, label) => {
+  const selectedValues = currentShareholder[field] || [];
+  
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {selectedValues.map((value, index) => (
+          <span
+            key={index}
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+          >
+            {value}
+            <button
+              type="button"
+              onClick={() => removeFromMultiSelect(field, value)}
+              className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-blue-400 hover:text-blue-600 hover:bg-blue-200"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <select
+        className="input"
+        value=""
+        onChange={(e) => {
+          if (e.target.value) {
+            addToMultiSelect(field, e.target.value);
+            e.target.value = "";
+          }
+        }}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
 
   return (
     <div className="border border-gray-200 rounded-lg">
@@ -693,6 +825,119 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Type</label>
+                  <select
+                    className="input"
+                    value={currentShareholder.idType}
+                    onChange={(e) => setCurrentShareholder(prev => ({ ...prev, idType: e.target.value }))}
+                  >
+                    <option value="">Select ID Type</option>
+                    {idTypes.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
+                  <input
+                    className="input"
+                    value={currentShareholder.idNumber}
+                    onChange={(e) => setCurrentShareholder(prev => ({ ...prev, idNumber: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Issue Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={currentShareholder.idIssueDate}
+                    onChange={(e) => setCurrentShareholder(prev => ({ ...prev, idIssueDate: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Expiry Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={currentShareholder.idExpiryDate}
+                    onChange={(e) => setCurrentShareholder(prev => ({ ...prev, idExpiryDate: e.target.value }))}
+                  />
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <input
+                    type="checkbox"
+                    id="sh-is-dual-nationality"
+                    checked={currentShareholder.isDualNationality}
+                    onChange={(e) =>
+                      setCurrentShareholder(prev => ({ ...prev, isDualNationality: e.target.checked }))
+                    }
+                  />
+                  <label htmlFor="sh-is-dual-nationality" className="text-sm font-medium text-gray-700">
+                    Is Dual Nationality?
+                  </label>
+                </div>
+                {currentShareholder.isDualNationality && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Dual Nationality</label>
+                      <select
+                        className={`input ${errors.dualNationality && touched.dualNationality ? 'border-red-500' : ''}`}
+                        value={currentShareholder.dualNationality}
+                        onChange={(e) => handleInputChange('dualNationality', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualNationality')}
+                      >
+                        <option value="">Select Dual Nationality</option>
+                        {countries.map((country) => (
+                          <option key={country.code} value={country.code}>
+                            {country.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.dualNationality && touched.dualNationality && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualNationality}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Number</label>
+                      <input
+                        className={`input ${errors.dualPassportNumber && touched.dualPassportNumber ? 'border-red-500' : ''}`}
+                        value={currentShareholder.dualPassportNumber}
+                        onChange={(e) => handleInputChange('dualPassportNumber', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualPassportNumber')}
+                      />
+                      {errors.dualPassportNumber && touched.dualPassportNumber && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportNumber}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Issue Date</label>
+                      <input
+                        type="date"
+                        className={`input ${errors.dualPassportIssueDate && touched.dualPassportIssueDate ? 'border-red-500' : ''}`}
+                        value={currentShareholder.dualPassportIssueDate}
+                        onChange={(e) => handleInputChange('dualPassportIssueDate', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualPassportIssueDate')}
+                      />
+                      {errors.dualPassportIssueDate && touched.dualPassportIssueDate && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportIssueDate}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Expiry Date</label>
+                      <input
+                        type="date"
+                        className={`input ${errors.dualPassportExpiryDate && touched.dualPassportExpiryDate ? 'border-red-500' : ''}`}
+                        value={currentShareholder.dualPassportExpiryDate}
+                        onChange={(e) => handleInputChange('dualPassportExpiryDate', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualPassportExpiryDate')}
+                      />
+                      {errors.dualPassportExpiryDate && touched.dualPassportExpiryDate && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportExpiryDate}</p>
+                      )}
+                    </div>
+                  </>
+                )}
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                   <div className="flex gap-2">
                     <select
@@ -811,8 +1056,8 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
                     onChange={(e) => setCurrentShareholder(prev => ({ ...prev, pep: e.target.value }))}
                   >
                     <option value="">Select PEP Status</option>
-                    {yesNoOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                    {pepOptions.map((item) => (
+                      <option key={item} value={item}>{item}</option>
                     ))}
                   </select>
                 </div>
@@ -827,19 +1072,6 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
                   {errors.shareholding && touched.shareholding && (
                     <p className="text-red-500 text-sm mt-1">{errors.shareholding}</p>
                   )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Dual Nationality</label>
-                  <select 
-                    className="input"
-                    value={currentShareholder.dualNationality}
-                    onChange={(e) => setCurrentShareholder(prev => ({ ...prev, dualNationality: e.target.value }))}
-                  >
-                    <option value="">Select Dual Nationality</option>
-                    {countries.map((country) => (
-                      <option key={country.code} value={country.code}>{country.name}</option>
-                    ))}
-                  </select>
                 </div>
                 <div className="flex items-center space-x-2">
                   <input 
@@ -931,8 +1163,9 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
                     onChange={(e) => setCurrentShareholder(prev => ({ ...prev, licenseType: e.target.value }))}
                   >
                     <option value="">Select License Type</option>
-                    <option value="Type 1">Type 1</option>
-                    <option value="Type 2">Type 2</option>
+                      {licenseTypes.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
                   </select>
                 </div>
                 <div>
@@ -966,29 +1199,20 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Business Activity</label>
-                  <select 
-                    className="input"
-                    value={currentShareholder.businessActivity || ""}
-                    onChange={(e) => setCurrentShareholder(prev => ({ ...prev, businessActivity: e.target.value }))}
-                  >
-                    <option value="">Select Business Activity</option>
-                    <option value="Trading">Trading</option>
-                    <option value="Services">Services</option>
-                  </select>
+                  {renderMultiSelect(
+                    'businessActivity',
+                    businessActivities, // import from dropdownOptions.js
+                    'Select Business Activity',
+                    'Business Activity'
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Countries of Operation</label>
-                  <select 
-                    className="input"
-                    value={currentShareholder.countriesOfOperation || ""}
-                    onChange={(e) => setCurrentShareholder(prev => ({ ...prev, countriesOfOperation: e.target.value }))}
-                  >
-                    <option value="">Select Countries of Operation</option>
-                    {countries.map((country) => (
-                      <option key={country.code} value={country.code}>{country.name}</option>
-                    ))}
-                  </select>
+                  {renderMultiSelect(
+                    'countriesOfOperation',
+                    countries.map(c => c.name),
+                    'Select Countries of Operation',
+                    'Countries of Operation'
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Source of Funds</label>
@@ -1012,17 +1236,12 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Countries Source of Funds</label>
-                  <select 
-                    className="input"
-                    value={currentShareholder.countriesSourceOfFunds || ""}
-                    onChange={(e) => setCurrentShareholder(prev => ({ ...prev, countriesSourceOfFunds: e.target.value }))}
-                  >
-                    <option value="">Select Countries Source of Funds</option>
-                    {countries.map((country) => (
-                      <option key={country.code} value={country.code}>{country.name}</option>
-                    ))}
-                  </select>
+                  {renderMultiSelect(
+                    'countriesSourceOfFunds',
+                    countries.map(c => c.name),
+                    'Select Countries Source of Funds',
+                    'Countries Source of Funds'
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -1249,5 +1468,3 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
 };
 
 export default ShareholdersSection;
-
-

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { customerService } from "../../services";
 import { countries } from "../../data/countries";
+import { transactionProducts } from "../../data/dropdownOptions";
 import NaturalPersonForm from "./forms/NaturalPersonForm";
 import LegalEntityForm from "./forms/LegalEntityForm";
 import ShareholdersSection from "./sections/ShareholdersSection";
@@ -267,10 +268,11 @@ const OnboardingForm = ({
       
       case "transactionAmountLimit":
       case "transactionLimit":
-        if (!value) {
-          error = "This field is required";
-        } else if (isNaN(value) || parseFloat(value) <= 0) {
-          error = "Must be a positive number";
+        // Optional fields: only validate if a value is provided
+        if (value) {
+          if (isNaN(value) || parseFloat(value) <= 0) {
+            error = "Must be a positive number";
+          }
         }
         break;
       
@@ -995,25 +997,11 @@ const OnboardingForm = ({
               onBlur={() => handleFieldBlur('transactionProduct')}
             >
               <option value="">Select Transaction Product</option>
-              <option value="Standard Project">Standard Project</option>
-              <option value="Capital Markets">Capital Markets</option>
-              <option value="Commercial Dispute Resolution Notes">Commercial Dispute Resolution Notes</option>
-              <option value="Commercial">Commercial</option>
-              <option value="Competition">Competition</option>
-              <option value="Corporate Intelligence">Corporate Intelligence</option>
-              <option value="Employment">Employment</option>
-              <option value="Criminal Litigation">Criminal Litigation</option>
-              <option value="Gold Bars">Gold Bars</option>
-              <option value="Silver Bars">Silver Bars</option>
-              <option value="Gold Grains">Gold Grains</option>
-              <option value="Silver Grains">Silver Grains</option>
-              <option value="GOLD">GOLD</option>
-              <option value="SILVER">SILVER</option>
-              <option value="DIAMOND">DIAMOND</option>
-              <option value="JEWELLERY">JEWELLERY</option>
-              <option value="OffPlan property">OffPlan property</option>
-              <option value="Secondary property">Secondary property</option>
-              <option value="PLATINUM">PLATINUM</option>
+              {transactionProducts.map((product) => (
+                <option key={product} value={product}>
+                  {product}
+                </option>
+              ))}
             </select>
             {errors.transactionProduct && touched.transactionProduct && (
               <p className="text-red-500 text-sm mt-1">{errors.transactionProduct}</p>
@@ -1022,7 +1010,7 @@ const OnboardingForm = ({
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Transaction Amount Limit <span className="text-red-500">*</span>
+              Transaction Amount Limit
             </label>
             <input 
               type="number"
@@ -1041,7 +1029,7 @@ const OnboardingForm = ({
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Transaction Limit <span className="text-red-500">*</span>
+              Transaction Limit
             </label>
             <input 
               type="number"

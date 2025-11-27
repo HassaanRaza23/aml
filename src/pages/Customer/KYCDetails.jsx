@@ -444,7 +444,7 @@ const KYCDetails = () => {
       {/* ID Information - Only for Natural Person */}
       {customerData.customer_type === 'Natural Person' && customerDetails && (
       <Section title="ID Information">
-               <ReadOnlyField label="Residency Status" value={customerDetails?.residencystatus || '—'} />
+          <ReadOnlyField label="Residency Status" value={customerDetails?.residencystatus || '—'} />
           <ReadOnlyField label="ID Type" value={customerDetails?.idtype || '—'} />
           <ReadOnlyField label="ID Number" value={customerDetails?.idnumber || '—'} />
           <ReadOnlyField label="Issue Date" value={customerDetails?.issuedate || '—'} />
@@ -533,6 +533,19 @@ const KYCDetails = () => {
                             <ReadOnlyField label="Nationality" value={sh.nationality || '—'} />
                             <ReadOnlyField label="Date of Birth" value={sh.dateOfBirth || '—'} />
                             <ReadOnlyField label="Place of Birth" value={sh.placeOfBirth || '—'} />
+                            <ReadOnlyField label="ID Type" value={sh.idType || '—'} />
+                            <ReadOnlyField label="ID Number" value={sh.idNumber || '—'} />
+                            <ReadOnlyField label="Issue Date" value={sh.idIssueDate || '—'} />
+                            <ReadOnlyField label="Expiry Date" value={sh.idExpiryDate || '—'} />
+                            <ReadOnlyField label="Is Dual Nationality" value={sh.isDualNationality ? 'Yes' : 'No'} />
+                            {sh.isDualNationality && (
+                              <>
+                                <ReadOnlyField label="Dual Nationality" value={sh.dualNationality || '—'} />
+                                <ReadOnlyField label="Dual Passport Number" value={sh.dualPassportNumber || '—'} />
+                                <ReadOnlyField label="Dual Passport Issue Date" value={sh.dualPassportIssueDate || '—'} />
+                                <ReadOnlyField label="Dual Passport Expiry Date" value={sh.dualPassportExpiryDate || '—'} />
+                              </>
+                            )}
                             <ReadOnlyField label="Phone" value={sh.phone || '—'} />
                             <ReadOnlyField label="Email" value={sh.email || '—'} />
                             <ReadOnlyField label="Address" value={sh.address || '—'} />
@@ -668,8 +681,22 @@ const KYCDetails = () => {
                         <ReadOnlyField label="Country of Residence" value={director.countryOfResidence || '—'} />
                         <ReadOnlyField label="Nationality" value={director.nationality || '—'} />
                         <ReadOnlyField label="Date of Birth" value={director.dateOfBirth || '—'} />
-                        <ReadOnlyField label="Phone" value={director.phone || '—'} />
+                        
                         <ReadOnlyField label="Place of Birth" value={director.placeOfBirth || '—'} />
+                        <ReadOnlyField label="ID Type" value={director.idType || '—'} />
+                        <ReadOnlyField label="ID Number" value={director.idNumber || '—'} />
+                        <ReadOnlyField label="Issue Date" value={director.idIssueDate || '—'} />
+                        <ReadOnlyField label="Expiry Date" value={director.idExpiryDate || '—'} />
+                        <ReadOnlyField label="Is Dual Nationality" value={director.isDualNationality ? 'Yes' : 'No'} />
+                        {director.isDualNationality && (
+                          <>
+                            <ReadOnlyField label="Dual Nationality" value={director.dualNationality || '—'} />
+                            <ReadOnlyField label="Dual Passport Number" value={director.dualPassportNumber || '—'} />
+                            <ReadOnlyField label="Dual Passport Issue Date" value={director.dualPassportIssueDate || '—'} />
+                            <ReadOnlyField label="Dual Passport Expiry Date" value={director.dualPassportExpiryDate || '—'} />
+                          </>
+                        )}
+                        <ReadOnlyField label="Phone" value={director.phone || '—'} />
                         <ReadOnlyField label="Email" value={director.email || '—'} />
                         <ReadOnlyField label="Address" value={director.address || '—'} />
                         <ReadOnlyField label="City" value={director.city || '—'} />
@@ -842,6 +869,19 @@ const KYCDetails = () => {
                         <ReadOnlyField label="Nationality" value={ubo.nationality || '—'} />
                         <ReadOnlyField label="Date of Birth" value={ubo.dateOfBirth || '—'} />
                         <ReadOnlyField label="Place of Birth" value={ubo.placeOfBirth || '—'} />
+                        <ReadOnlyField label="ID Type" value={ubo.idType || '—'} />
+                            <ReadOnlyField label="ID Number" value={ubo.idNumber || '—'} />
+                            <ReadOnlyField label="Issue Date" value={ubo.idIssueDate || '—'} />
+                            <ReadOnlyField label="Expiry Date" value={ubo.idExpiryDate || '—'} />
+                            <ReadOnlyField label="Is Dual Nationality" value={ubo.isDualNationality ? 'Yes' : 'No'} />
+                            {ubo.isDualNationality && (
+                              <>
+                                <ReadOnlyField label="Dual Nationality" value={ubo.dualNationality || '—'} />
+                                <ReadOnlyField label="Dual Passport Number" value={ubo.dualPassportNumber || '—'} />
+                                <ReadOnlyField label="Dual Passport Issue Date" value={ubo.dualPassportIssueDate || '—'} />
+                                <ReadOnlyField label="Dual Passport Expiry Date" value={ubo.dualPassportExpiryDate || '—'} />
+                              </>
+                            )}
                         <ReadOnlyField label="Phone" value={ubo.phone || '—'} />
                         <ReadOnlyField label="Email" value={ubo.email || '—'} />
                         <ReadOnlyField label="Address" value={ubo.address || '—'} />

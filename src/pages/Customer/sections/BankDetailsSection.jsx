@@ -212,8 +212,6 @@ const BankDetailsSection = ({ bankDetails = [], onBankDetailsChange, isEdit = fa
                     <option value="call">Call</option>
                     <option value="fixed">Fixed</option>
                     <option value="current">Current</option>
-                    <option value="savings">Savings</option>
-                    <option value="checking">Checking</option>
                   </select>
                 </div>
                 <div>
@@ -275,7 +273,6 @@ const BankDetailsSection = ({ bankDetails = [], onBankDetailsChange, isEdit = fa
                     <option value="">Select Mode of Signatory</option>
                     <option value="single">Single</option>
                     <option value="dual">Dual</option>
-                    <option value="multiple">Multiple</option>
                   </select>
                 </div>
                 <div>
@@ -301,7 +298,6 @@ const BankDetailsSection = ({ bankDetails = [], onBankDetailsChange, isEdit = fa
                     <option value="">Select Bank Signatory</option>
                     <option value="signatory1">Signatory 1</option>
                     <option value="signatory2">Signatory 2</option>
-                    <option value="signatory3">Signatory 3</option>
                   </select>
                 </div>
               </div>

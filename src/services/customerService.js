@@ -459,17 +459,46 @@ export const customerService = {
     try {
       // Note: updated_by is removed since it requires a valid user ID
       
-      // Separate main customer data from detail data
+      // Build main customer data only from fields that are actually provided
       const mainCustomerData = {
-        core_system_id: updateData.core_system_id,
-        customer_type: updateData.customer_type,
-        email: updateData.email,
-        phone: updateData.phone,
-        channel: updateData.channel,
-        transaction_product: updateData.transaction_product,
-        transaction_amount_limit: updateData.transaction_amount_limit,
-        transaction_limit: updateData.transaction_limit,
         updated_at: new Date().toISOString()
+      };
+
+      // Core customer fields (used by onboarding / edit flows)
+      if (Object.prototype.hasOwnProperty.call(updateData, 'core_system_id')) {
+        mainCustomerData.core_system_id = updateData.core_system_id;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'customer_type')) {
+        mainCustomerData.customer_type = updateData.customer_type;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'email')) {
+        mainCustomerData.email = updateData.email;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'phone')) {
+        mainCustomerData.phone = updateData.phone;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'channel')) {
+        mainCustomerData.channel = updateData.channel;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'transaction_product')) {
+        mainCustomerData.transaction_product = updateData.transaction_product;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'transaction_amount_limit')) {
+        mainCustomerData.transaction_amount_limit = updateData.transaction_amount_limit;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'transaction_limit')) {
+        mainCustomerData.transaction_limit = updateData.transaction_limit;
+      }
+
+      // KYC-related fields (used by KYCDetails page)
+      if (Object.prototype.hasOwnProperty.call(updateData, 'kyc_status')) {
+        mainCustomerData.kyc_status = updateData.kyc_status;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'kyc_remarks')) {
+        mainCustomerData.kyc_remarks = updateData.kyc_remarks;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'due_diligence_level')) {
+        mainCustomerData.due_diligence_level = updateData.due_diligence_level;
       }
       
       // Update main customer table
@@ -1562,7 +1591,17 @@ export const customerService = {
             occupation: naturalPersonDetails.occupation,
             expectedIncome: naturalPersonDetails.expected_income_range,
             pep: naturalPersonDetails.pep_status,
+            // Dual nationality & passport details
+            isDualNationality: naturalPersonDetails.is_dual_nationality,
             dualNationality: naturalPersonDetails.dual_nationality,
+            dualPassportNumber: naturalPersonDetails.dual_passport_number,
+            dualPassportIssueDate: naturalPersonDetails.dual_passport_issue_date,
+            dualPassportExpiryDate: naturalPersonDetails.dual_passport_expiry_date,
+            // ID details
+            idType: naturalPersonDetails.id_type,
+            idNumber: naturalPersonDetails.id_number,
+            idIssueDate: naturalPersonDetails.id_issue_date,
+            idExpiryDate: naturalPersonDetails.id_expiry_date,
             isDirector: naturalPersonDetails.is_director,
             isUbo: naturalPersonDetails.is_ubo
           };
@@ -1703,7 +1742,17 @@ export const customerService = {
               occupation: naturalPersonDetails.occupation,
               expectedIncome: naturalPersonDetails.expected_income_range,
               pep: naturalPersonDetails.pep_status,
+              // Dual nationality & passport details
+              isDualNationality: naturalPersonDetails.is_dual_nationality,
               dualNationality: naturalPersonDetails.dual_nationality,
+              dualPassportNumber: naturalPersonDetails.dual_passport_number,
+              dualPassportIssueDate: naturalPersonDetails.dual_passport_issue_date,
+              dualPassportExpiryDate: naturalPersonDetails.dual_passport_expiry_date,
+              // ID details
+              idType: naturalPersonDetails.id_type,
+              idNumber: naturalPersonDetails.id_number,
+              idIssueDate: naturalPersonDetails.id_issue_date,
+              idExpiryDate: naturalPersonDetails.id_expiry_date,
               isDirector: naturalPersonDetails.is_director,
               isUbo: naturalPersonDetails.is_ubo
             };
@@ -1855,7 +1904,18 @@ export const customerService = {
             occupation: shareholder.occupation,
             expected_income_range: shareholder.expectedIncome,
             pep_status: shareholder.pep,
+            // Dual nationality & passport details
             dual_nationality: shareholder.dualNationality,
+            is_dual_nationality: shareholder.isDualNationality || false,
+            dual_passport_number: shareholder.dualPassportNumber ,
+            dual_passport_issue_date: shareholder.dualPassportIssueDate || null,
+            dual_passport_expiry_date: shareholder.dualPassportExpiryDate || null,
+            // ID details
+            id_type: shareholder.idType,
+            id_number: shareholder.idNumber,
+            id_issue_date: shareholder.idIssueDate || null,
+            id_expiry_date: shareholder.idExpiryDate || null,
+            // Flags
             is_director: shareholder.isDirector,
             is_ubo: shareholder.isUbo
           };
@@ -2110,6 +2170,17 @@ export const customerService = {
         dateOfBirth: director.date_of_birth,
         phone: director.phone,
         placeOfBirth: director.place_of_birth,
+        // Dual nationality & passport details
+        isDualNationality: director.is_dual_nationality,
+        dualNationality: director.dual_nationality,
+        dualPassportNumber: director.dual_passport_number,
+        dualPassportIssueDate: director.dual_passport_issue_date,
+        dualPassportExpiryDate: director.dual_passport_expiry_date,
+        // ID details
+        idType: director.id_type,
+        idNumber: director.id_number,
+        idIssueDate: director.id_issue_date,
+        idExpiryDate: director.id_expiry_date,
         email: director.email,
         address: director.address,
         city: director.city,
@@ -2117,7 +2188,6 @@ export const customerService = {
         pepStatus: director.pep_status,
         isCeo: director.is_ceo,
         isRepresentative: director.is_representative,
-        dualNationality: director.dual_nationality
       }));
 
       return { 
@@ -2166,6 +2236,17 @@ export const customerService = {
         dateOfBirth: director.date_of_birth,
         phone: director.phone,
         placeOfBirth: director.place_of_birth,
+         // Dual nationality & passport details
+         isDualNationality: director.is_dual_nationality,
+         dualNationality: director.dual_nationality,
+         dualPassportNumber: director.dual_passport_number,
+         dualPassportIssueDate: director.dual_passport_issue_date,
+         dualPassportExpiryDate: director.dual_passport_expiry_date,
+         // ID details
+         idType: director.id_type,
+         idNumber: director.id_number,
+         idIssueDate: director.id_issue_date,
+         idExpiryDate: director.id_expiry_date,
         email: director.email,
         address: director.address,
         city: director.city,
@@ -2173,7 +2254,6 @@ export const customerService = {
         pepStatus: director.pep_status,
         isCeo: director.is_ceo,
         isRepresentative: director.is_representative,
-        dualNationality: director.dual_nationality
       };
 
       return { 
@@ -2253,6 +2333,16 @@ export const customerService = {
         date_of_birth: director.dateOfBirth || null,
         phone: director.phone,
         place_of_birth: director.placeOfBirth,
+        dual_nationality: director.dualNationality ,
+        is_dual_nationality: director.isDualNationality ,
+        dual_passport_number: director.dualPassportNumber ,
+        dual_passport_issue_date: director.dualPassportIssueDate || null,
+        dual_passport_expiry_date: director.dualPassportExpiryDate || null,
+        // ID details
+        id_type: director.idType,
+        id_number: director.idNumber ,
+        id_issue_date: director.idIssueDate || null,
+        id_expiry_date: director.idExpiryDate || null,
         email: director.email,
         address: director.address,
         city: director.city,
@@ -2260,7 +2350,6 @@ export const customerService = {
         pep_status: director.pepStatus,
         is_ceo: director.isCeo,
         is_representative: director.isRepresentative,
-        dual_nationality: director.dualNationality
       }))
       
       console.log('👔 Final directors payload:', directorsPayload)
@@ -2430,6 +2519,16 @@ export const customerService = {
         nationality: ubo.nationality || '',
         date_of_birth: ubo.dateOfBirth || null,
         place_of_birth: ubo.placeOfBirth || '',
+        // Dual nationality & passport details
+        is_dual_nationality: ubo.isDualNationality || false,
+        dual_passport_number: ubo.dualPassportNumber || '',
+        dual_passport_issue_date: ubo.dualPassportIssueDate || '',
+        dual_passport_expiry_date: ubo.dualPassportExpiryDate || '',
+        // ID details
+        id_type: ubo.idType || '',
+        id_number: ubo.idNumber || '',
+        id_issue_date: ubo.idIssueDate || '',
+        id_expiry_date: ubo.idExpiryDate || '',
         phone: ubo.phone || '',
         email: ubo.email || '',
         address: ubo.address || '',
@@ -2502,6 +2601,16 @@ export const customerService = {
         nationality: ubo.nationality || '',
         dateOfBirth: ubo.date_of_birth || '',
         placeOfBirth: ubo.place_of_birth || '',
+        // Dual nationality & passport details
+        isDualNationality: ubo.is_dual_nationality|| '',
+        dualPassportNumber: ubo.dual_passport_number|| '',
+        dualPassportIssueDate: ubo.dual_passport_issue_date|| '',
+        dualPassportExpiryDate: ubo.dual_passport_expiry_date|| '',
+        // ID details
+        idType: ubo.id_type|| '',
+        idNumber: ubo.id_number|| '',
+        idIssueDate: ubo.id_issue_date|| '',
+        idExpiryDate: ubo.id_expiry_date|| '',
         phone: ubo.phone || '',
         email: ubo.email || '',
         address: ubo.address || '',
@@ -2566,6 +2675,15 @@ export const customerService = {
         nationality: ubo.nationality || '',
         dateOfBirth: ubo.date_of_birth || '',
         placeOfBirth: ubo.place_of_birth || '',
+        isDualNationality: ubo.is_dual_nationality|| '',
+        dualPassportNumber: ubo.dual_passport_number|| '',
+        dualPassportIssueDate: ubo.dual_passport_issue_date|| '',
+        dualPassportExpiryDate: ubo.dual_passport_expiry_date|| '',
+        // ID details
+        idType: ubo.id_type|| '',
+        idNumber: ubo.id_number|| '',
+        idIssueDate: ubo.id_issue_date|| '',
+        idExpiryDate: ubo.id_expiry_date|| '',
         phone: ubo.phone || '',
         email: ubo.email || '',
         address: ubo.address || '',

@@ -1,7 +1,7 @@
 import React, { useState, useImperativeHandle, forwardRef } from "react";
 import { countries } from "../../../data/countries";
 import { occupations } from "../../../data/occupations";
-import { sourceOfWealth, sourceOfFunds, pepOptions } from "../../../data/dropdownOptions";
+import { sourceOfWealth, sourceOfFunds, pepOptions, idTypes } from "../../../data/dropdownOptions";
 
 // Parse phone number for edit mode (split country code and phone number)
 const parsePhoneNumber = (fullPhone) => {
@@ -39,6 +39,14 @@ const UBOSection = forwardRef(({ ubos = [], onUbosChange, isEdit = false }, ref)
     nationality: "",
     dateOfBirth: "",
     placeOfBirth: "",
+    idType: "",
+    idNumber: "",
+    idIssueDate: "",
+    idExpiryDate: "",
+    isDualNationality: false,
+    dualPassportNumber: "",
+    dualPassportIssueDate: "",
+    dualPassportExpiryDate: "",
     countryCode: "+971",
     phone: "",
     email: "",
@@ -181,6 +189,14 @@ const UBOSection = forwardRef(({ ubos = [], onUbosChange, isEdit = false }, ref)
       nationality: "",
       dateOfBirth: "",
       placeOfBirth: "",
+      idType: "",
+      idNumber: "",
+      idIssueDate: "",
+      idExpiryDate: "",
+      isDualNationality: false,
+      dualPassportNumber: "",
+      dualPassportIssueDate: "",
+      dualPassportExpiryDate: "",
       countryCode: "+971",
       phone: "",
       email: "",
@@ -232,6 +248,14 @@ const UBOSection = forwardRef(({ ubos = [], onUbosChange, isEdit = false }, ref)
       nationality: "",
       dateOfBirth: "",
       placeOfBirth: "",
+      idType: "",
+      idNumber: "",
+      idIssueDate: "",
+      idExpiryDate: "",
+      isDualNationality: false,
+      dualPassportNumber: "",
+      dualPassportIssueDate: "",
+      dualPassportExpiryDate: "",
       countryCode: "+971",
       phone: "",
       email: "",
@@ -261,6 +285,15 @@ const UBOSection = forwardRef(({ ubos = [], onUbosChange, isEdit = false }, ref)
       nationality: uboData.nationality || '',
       dateOfBirth: uboData.dateOfBirth || '',
       placeOfBirth: uboData.placeOfBirth || '',
+      isDualNationality: uboData.isDualNationality || '',
+      dualNationality: uboData.dualNationality || '',
+      dualPassportNumber: uboData.dualPassportNumber || '',
+      dualPassportIssueDate: uboData.dualPassportIssueDate || '',
+      dualPassportExpiryDate: uboData.dualPassportExpiryDate || '',
+      idType: uboData.idType || '',
+      idNumber: uboData.idNumber || '',
+      idIssueDate: uboData.idIssueDate || '',
+      idExpiryDate: uboData.idExpiryDate || '',
       countryCode: countryCode || '+971',
       phone: phone || '',
       email: uboData.email || '',
@@ -271,7 +304,6 @@ const UBOSection = forwardRef(({ ubos = [], onUbosChange, isEdit = false }, ref)
       expectedIncome: uboData.expectedIncome || '',
       pep: uboData.pep || '',
       shareholding: uboData.shareholding || '',
-      dualNationality: uboData.dualNationality || ''
     });
     
     // Show the form and set it to add mode
@@ -460,6 +492,119 @@ const UBOSection = forwardRef(({ ubos = [], onUbosChange, isEdit = false }, ref)
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Type</label>
+                  <select
+                    className="input"
+                    value={currentUbo.idType}
+                    onChange={(e) => setCurrentUbo(prev => ({ ...prev, idType: e.target.value }))}
+                  >
+                    <option value="">Select ID Type</option>
+                    {idTypes.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
+                  <input
+                    className="input"
+                    value={currentUbo.idNumber}
+                    onChange={(e) => setCurrentUbo(prev => ({ ...prev, idNumber: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Issue Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={currentUbo.idIssueDate}
+                    onChange={(e) => setCurrentUbo(prev => ({ ...prev, idIssueDate: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Expiry Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={currentUbo.idExpiryDate}
+                    onChange={(e) => setCurrentUbo(prev => ({ ...prev, idExpiryDate: e.target.value }))}
+                  />
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <input
+                    type="checkbox"
+                    id="sh-is-dual-nationality"
+                    checked={currentUbo.isDualNationality}
+                    onChange={(e) =>
+                      setCurrentUbo(prev => ({ ...prev, isDualNationality: e.target.checked }))
+                    }
+                  />
+                  <label htmlFor="sh-is-dual-nationality" className="text-sm font-medium text-gray-700">
+                    Is Dual Nationality?
+                  </label>
+                </div>
+                {currentUbo.isDualNationality && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Dual Nationality</label>
+                      <select
+                        className={`input ${errors.dualNationality && touched.dualNationality ? 'border-red-500' : ''}`}
+                        value={currentUbo.dualNationality}
+                        onChange={(e) => handleInputChange('dualNationality', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualNationality')}
+                      >
+                        <option value="">Select Dual Nationality</option>
+                        {countries.map((country) => (
+                          <option key={country.code} value={country.code}>
+                            {country.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.dualNationality && touched.dualNationality && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualNationality}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Number</label>
+                      <input
+                        className={`input ${errors.dualPassportNumber && touched.dualPassportNumber ? 'border-red-500' : ''}`}
+                        value={currentUbo.dualPassportNumber}
+                        onChange={(e) => handleInputChange('dualPassportNumber', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualPassportNumber')}
+                      />
+                      {errors.dualPassportNumber && touched.dualPassportNumber && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportNumber}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Issue Date</label>
+                      <input
+                        type="date"
+                        className={`input ${errors.dualPassportIssueDate && touched.dualPassportIssueDate ? 'border-red-500' : ''}`}
+                        value={currentUbo.dualPassportIssueDate}
+                        onChange={(e) => handleInputChange('dualPassportIssueDate', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualPassportIssueDate')}
+                      />
+                      {errors.dualPassportIssueDate && touched.dualPassportIssueDate && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportIssueDate}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Expiry Date</label>
+                      <input
+                        type="date"
+                        className={`input ${errors.dualPassportExpiryDate && touched.dualPassportExpiryDate ? 'border-red-500' : ''}`}
+                        value={currentUbo.dualPassportExpiryDate}
+                        onChange={(e) => handleInputChange('dualPassportExpiryDate', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualPassportExpiryDate')}
+                      />
+                      {errors.dualPassportExpiryDate && touched.dualPassportExpiryDate && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportExpiryDate}</p>
+                      )}
+                    </div>
+                  </>
+                )}
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                   <div className="flex gap-2">
                     <select
@@ -602,19 +747,6 @@ const UBOSection = forwardRef(({ ubos = [], onUbosChange, isEdit = false }, ref)
                   {errors.shareholding && touched.shareholding && (
                     <p className="text-red-500 text-sm mt-1">{errors.shareholding}</p>
                   )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Dual Nationality</label>
-                  <select 
-                    className="input"
-                    value={currentUbo.dualNationality}
-                    onChange={(e) => handleInputChange('dualNationality', e.target.value)}
-                  >
-                    <option value="">Select Dual Nationality</option>
-                    {countries.map((country) => (
-                      <option key={country.code} value={country.code}>{country.name}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
               
