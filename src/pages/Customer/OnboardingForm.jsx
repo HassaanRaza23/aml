@@ -633,7 +633,7 @@ const OnboardingForm = ({
         risk_score: 0, // Will be calculated after all data is saved
         risk_level: "Low", // Will be calculated after all data is saved
         kyc_status: "Pending", // Will be determined based on risk level
-        due_diligence_level: "Standard", // Will be determined based on risk level
+        due_diligence_level: "Simplified Customer Due Diligence", // Will be calculated based on risk level
         status: "Active"
       };
 

@@ -228,37 +228,20 @@ const KYCDetails = () => {
       setKycStatus(customerData.kyc_status || "Pending");
       setRemarks(customerData.kyc_remarks || "");
       
-      // Auto-set due diligence level based on risk level if not already set
-      if (!customerData.due_diligence_level) {
-        const autoDueDiligenceLevel = getDueDiligenceLevel(customerData.risk_level);
-        setDueDiligenceLevel(autoDueDiligenceLevel);
-      } else {
-        setDueDiligenceLevel(customerData.due_diligence_level);
-      }
+      // Set due diligence level from database (calculated during risk assessment)
+      setDueDiligenceLevel(customerData.due_diligence_level || "Simplified Customer Due Diligence");
       
       // Load verification checks
       loadVerificationChecks();
     }
   }, [customerData, loadVerificationChecks]);
 
-  // Determine Due Diligence Level from Risk Score
-  const getDueDiligenceLevel = (riskScore) => {
-    if (typeof riskScore === "string") {
-      riskScore = riskScore.toLowerCase();
-      if (riskScore === "low") return "Simplified Due Diligence (SDD)";
-      if (riskScore === "medium") return "Customer Due Diligence (CDD)";
-      if (riskScore === "high") return "Enhanced Due Diligence (EDD)";
-      return "Customer Due Diligence (CDD)";
-    }
-    if (riskScore < 40) return "Simplified Due Diligence (SDD)";
-    if (riskScore < 70) return "Customer Due Diligence (CDD)";
-    return "Enhanced Due Diligence (EDD)";
-  };
 
   // Local state for KYC assessment inputs
   const [kycStatus, setKycStatus] = useState("Pending");
   const [remarks, setRemarks] = useState("");
   const [dueDiligenceLevel, setDueDiligenceLevel] = useState("Standard");
+  const [remarksError, setRemarksError] = useState("");
 
   const [verificationChecks, setVerificationChecks] = useState({});
   
@@ -877,66 +860,86 @@ const KYCDetails = () => {
         <div className="mb-4 col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Due Diligence Level
-            {!customerData?.due_diligence_level && (
-              <span className="ml-2 text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                Auto-calculated from Risk Level
-              </span>
-            )}
           </label>
           <select
             className="w-full border border-gray-300 rounded-md p-2"
             value={dueDiligenceLevel}
             onChange={(e) => setDueDiligenceLevel(e.target.value)}
           >
-            <option value="Simplified Due Diligence (SDD)">Simplified Due Diligence (SDD)</option>
-            <option value="Customer Due Diligence (CDD)">Customer Due Diligence (CDD)</option>
-            <option value="Enhanced Due Diligence (EDD)">Enhanced Due Diligence (EDD)</option>
+            <option value="Simplified Customer Due Diligence">Simplified Customer Due Diligence</option>
+            <option value="Customer Due Diligence">Customer Due Diligence</option>
+            <option value="Enhanced Customer Due Diligence">Enhanced Customer Due Diligence</option>
           </select>
-          {!customerData?.due_diligence_level && (
-            <p className="mt-1 text-xs text-gray-500">
-              Based on risk level: {customerData?.risk_level || 'Low'} → {getDueDiligenceLevel(customerData?.risk_level)}
-            </p>
-          )}
+          <p className="mt-1 text-xs text-gray-500">
+            Calculated from risk level: {customerData?.risk_level || 'Low'}
+          </p>
         </div>
       </Section>
 
       {/* ✅ Additional Checks */}
         <Section title="Background & Verification Checks">
-        {verificationService.getDefaultQuestions().map(({ label, key }) => (
+        {verificationService.getDefaultQuestions(dueDiligenceLevel).map((item, index) => {
+          // If it's a heading, render it as a heading
+          if (item.type === "heading") {
+            return (
+              <div key={`heading-${index}`} className="col-span-2 mb-3 mt-4 first:mt-0">
+                <h4 className="text-base font-semibold text-gray-800">{item.label}</h4>
+              </div>
+            );
+          }
+          
+          // Otherwise, render as a question
+          const { label, key } = item;
+          return (
             <div key={key} className="col-span-2 mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-            <div className="flex items-center space-x-6 mb-2">
+              <div className="flex items-center space-x-6 mb-2">
                 <label className="flex items-center space-x-2">
-                <input
+                  <input
                     type="radio"
                     name={key}
                     value="yes"
                     checked={verificationChecks[key]?.answer === "yes"}
                     onChange={() =>
-                    setVerificationChecks((prev) => ({
+                      setVerificationChecks((prev) => ({
                         ...prev,
                         [key]: { answer: "yes", notes: prev[key]?.notes || "" },
-                    }))
+                      }))
                     }
-                />
-                <span>Yes</span>
+                  />
+                  <span>Yes</span>
                 </label>
                 <label className="flex items-center space-x-2">
-                <input
+                  <input
                     type="radio"
                     name={key}
                     value="no"
                     checked={verificationChecks[key]?.answer === "no"}
                     onChange={() =>
-                    setVerificationChecks((prev) => ({
+                      setVerificationChecks((prev) => ({
                         ...prev,
                         [key]: { answer: "no", notes: "" },
-                    }))
+                      }))
                     }
-                />
-                <span>No</span>
+                  />
+                  <span>No</span>
                 </label>
-            </div>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name={key}
+                    value="n/a"
+                    checked={verificationChecks[key]?.answer === "n/a"}
+                    onChange={() =>
+                      setVerificationChecks((prev) => ({
+                        ...prev,
+                        [key]: { answer: "n/a", notes: "" },
+                      }))
+                    }
+                  />
+                  <span>N/A</span>
+                </label>
+              </div>
             {verificationChecks[key]?.answer === "yes" && (
                 <textarea
                 className="w-full border border-gray-300 rounded-md p-2"
@@ -952,7 +955,8 @@ const KYCDetails = () => {
                 />
             )}
             </div>
-        ))}
+          );
+        })}
         </Section>
 
 
@@ -964,11 +968,26 @@ const KYCDetails = () => {
           onChange={(e) => setKycStatus(e.target.value)}
           options={["Pending", "Approved", "Rejected"]}
         />
-        <TextAreaField
-          label="Remarks"
-          value={remarks}
-          onChange={(e) => setRemarks(e.target.value)}
-        />
+        <div className="mb-4 col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Remarks <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            className={`w-full border rounded-md p-2 ${remarksError ? 'border-red-500' : 'border-gray-300'}`}
+            rows={3}
+            value={remarks}
+            onChange={(e) => {
+              setRemarks(e.target.value);
+              if (remarksError && e.target.value.trim()) {
+                setRemarksError("");
+              }
+            }}
+            required
+          />
+          {remarksError && (
+            <p className="text-red-500 text-xs mt-1">{remarksError}</p>
+          )}
+        </div>
       </Section>
 
       <div className="text-right mt-6">
@@ -976,6 +995,13 @@ const KYCDetails = () => {
             className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
             onClick={async () => {
               try {
+                // Validate remarks
+                if (!remarks || !remarks.trim()) {
+                  setRemarksError("Remarks are required");
+                  toast.error("Please provide remarks before saving");
+                  return;
+                }
+
                 // Save verification checks first
                 const verificationResult = await verificationService.saveVerificationChecks(
                   customerData.id, 
@@ -990,7 +1016,7 @@ const KYCDetails = () => {
                 // Update customer KYC status, remarks, and due diligence level
                 const kycPayload = {
                   kyc_status: kycStatus,
-                  kyc_remarks: remarks,
+                  kyc_remarks: remarks.trim(),
                   due_diligence_level: dueDiligenceLevel,
                 };
                 

@@ -2928,15 +2928,19 @@ export const customerService = {
         triggeredRules: riskResult.triggeredRules?.length || 0
       })
       
-      // Determine due diligence level based on risk (KYC status remains Pending)
-      let dueDiligenceLevel = 'Standard'
+      // Determine due diligence level based on risk level
+      // Low, Medium Low, or Medium → Simplified Customer Due Diligence
+      // Medium High → Customer Due Diligence
+      // High → Enhanced Customer Due Diligence
+      let dueDiligenceLevel = 'Simplified Customer Due Diligence'
       
-      if (riskResult.level === 'High' || riskResult.level === 'Medium High') {
-        dueDiligenceLevel = 'Enhanced'
-      } else if (riskResult.level === 'Medium' || riskResult.level === 'Medium Low') {
-        dueDiligenceLevel = 'Standard'
-      } else {
-        dueDiligenceLevel = 'Basic'
+      const riskLevel = riskResult.level
+      if (riskLevel === 'High') {
+        dueDiligenceLevel = 'Enhanced Customer Due Diligence'
+      } else if (riskLevel === 'Medium High') {
+        dueDiligenceLevel = 'Customer Due Diligence'
+      } else if (riskLevel === 'Low' || riskLevel === 'Medium Low' || riskLevel === 'Medium') {
+        dueDiligenceLevel = 'Simplified Customer Due Diligence'
       }
       
       // Update customer with calculated values (keeping KYC status as Pending)
