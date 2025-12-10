@@ -11,15 +11,14 @@ export const customerService = {
         console.log('🔧 Using mock customer creation (Supabase not configured)')
         
         // Calculate risk score
-        const riskScore = calculateRiskScore(customerData)
-        const riskLevel = riskScore >= 70 ? 'High' : riskScore >= 40 ? 'Medium' : 'Low'
+        const riskResult = await calculateRiskScore(customerData)
         
         // Create mock customer data
         const mockCustomer = {
           id: 'mock-' + Date.now(),
           ...customerData,
-          risk_score: riskScore,
-          risk_level: riskLevel,
+          risk_score: riskResult.score,
+          risk_level: riskResult.level,
           kyc_status: 'Pending',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -675,9 +674,15 @@ export const customerService = {
                 license_number: shareholder.licenseNumber,
                 license_issue_date: shareholder.licenseIssueDate || null,
                 license_expiry_date: shareholder.licenseExpiryDate || null,
-                business_activity: shareholder.businessActivity,
-                countries_of_operation: shareholder.countriesOfOperation,
-                countries_source_of_funds: shareholder.countriesSourceOfFunds,
+                business_activity: Array.isArray(shareholder.businessActivity) 
+                  ? JSON.stringify(shareholder.businessActivity) 
+                  : shareholder.businessActivity,
+                countries_of_operation: Array.isArray(shareholder.countriesOfOperation) 
+                  ? JSON.stringify(shareholder.countriesOfOperation) 
+                  : shareholder.countriesOfOperation,
+                countries_source_of_funds: Array.isArray(shareholder.countriesSourceOfFunds) 
+                  ? JSON.stringify(shareholder.countriesSourceOfFunds) 
+                  : shareholder.countriesSourceOfFunds,
                 source_of_funds: shareholder.sourceOfFunds,
                 registered_office_address: shareholder.registeredOfficeAddress,
                 email: shareholder.email,
@@ -788,9 +793,15 @@ export const customerService = {
                 license_number: shareholder.licenseNumber,
                 license_issue_date: shareholder.licenseIssueDate || null,
                 license_expiry_date: shareholder.licenseExpiryDate || null,
-                business_activity: shareholder.businessActivity,
-                countries_of_operation: shareholder.countriesOfOperation,
-                countries_source_of_funds: shareholder.countriesSourceOfFunds,
+                business_activity: Array.isArray(shareholder.businessActivity) 
+                  ? JSON.stringify(shareholder.businessActivity) 
+                  : shareholder.businessActivity,
+                countries_of_operation: Array.isArray(shareholder.countriesOfOperation) 
+                  ? JSON.stringify(shareholder.countriesOfOperation) 
+                  : shareholder.countriesOfOperation,
+                countries_source_of_funds: Array.isArray(shareholder.countriesSourceOfFunds) 
+                  ? JSON.stringify(shareholder.countriesSourceOfFunds) 
+                  : shareholder.countriesSourceOfFunds,
                 source_of_funds: shareholder.sourceOfFunds,
                 registered_office_address: shareholder.registeredOfficeAddress,
                 email: shareholder.email,
@@ -1056,13 +1067,12 @@ export const customerService = {
       
       // Recalculate risk score
       const customer = await customerService.getCustomerById(id)
-      const riskScore = calculateRiskScore(customer)
-      const riskLevel = riskScore >= 70 ? 'High' : riskScore >= 40 ? 'Medium' : 'Low'
+      const riskResult = await calculateRiskScore(customer)
       
       // Update risk score
       await dbHelpers.update('customers', id, {
-        risk_score: riskScore,
-        risk_level: riskLevel
+        risk_score: riskResult.score,
+        risk_level: riskResult.level
       })
       
       return { success: true, data: result, message: 'Customer updated successfully' }
@@ -1271,32 +1281,69 @@ export const customerService = {
     try {
       console.log('🔄 Starting risk score re-evaluation for all customers...')
       
-      // Get all customers
-      const result = await customerService.getCustomers(1, 1000) // Get all customers
-      if (!result.success) {
-        return { success: false, error: result.error }
+      // Fetch all customers with pagination to handle large datasets
+      let allCustomers = []
+      let page = 1
+      const pageSize = 1000
+      let hasMore = true
+      
+      while (hasMore) {
+        const result = await customerService.getCustomers(page, pageSize)
+        if (!result.success) {
+          console.error(`Error fetching customers page ${page}:`, result.error)
+          break
+        }
+        
+        if (result.data && result.data.length > 0) {
+          allCustomers = [...allCustomers, ...result.data]
+          hasMore = result.data.length === pageSize
+          page++
+        } else {
+          hasMore = false
+        }
       }
       
-      const customers = result.data
+      if (allCustomers.length === 0) {
+        return { 
+          success: true, 
+          message: 'No customers found to re-evaluate',
+          updatedCount: 0,
+          errorCount: 0
+        }
+      }
+      
+      console.log(`📊 Found ${allCustomers.length} customers to re-evaluate`)
+      
       let updatedCount = 0
       let errorCount = 0
       
-      // Re-evaluate each customer
-      for (const customer of customers) {
+      // Re-evaluate each customer with complete data
+      for (const customer of allCustomers) {
         try {
-          // Calculate new risk score with updated rules
-          const riskScore = calculateRiskScore(customer)
-          const riskLevel = riskScore >= 70 ? 'High' : riskScore >= 40 ? 'Medium' : 'Low'
+          // Fetch complete customer data including all related sections (shareholders, directors, etc.)
+          const completeCustomerData = await customerService.getCustomerById(customer.id)
           
-          // Update customer with new risk score
-          await customerService.updateCustomer(customer.id, {
-            risk_score: riskScore,
-            risk_level: riskLevel
-          })
+          if (!completeCustomerData) {
+            console.warn(`⚠️ Could not fetch complete data for customer ${customer.id}`)
+            errorCount++
+            continue
+          }
           
-          updatedCount++
+          // Use calculateAndUpdateRiskScore which handles complete calculation and DB update
+          const riskResult = await customerService.calculateAndUpdateRiskScore(
+            customer.id,
+            completeCustomerData
+          )
+          
+          if (riskResult.success) {
+            updatedCount++
+            console.log(`✅ Updated customer ${customer.id}: Risk Score=${riskResult.data.risk_score}, Level=${riskResult.data.risk_level}`)
+          } else {
+            console.error(`❌ Failed to update customer ${customer.id}:`, riskResult.error)
+            errorCount++
+          }
         } catch (error) {
-          console.error(`Error updating customer ${customer.id}:`, error)
+          console.error(`❌ Error processing customer ${customer.id}:`, error)
           errorCount++
         }
       }
@@ -1305,9 +1352,10 @@ export const customerService = {
       
       return { 
         success: true, 
-        message: `Re-evaluated ${updatedCount} customers successfully`,
+        message: `Re-evaluated ${allCustomers.length} customers: ${updatedCount} updated successfully, ${errorCount} errors`,
         updatedCount,
-        errorCount
+        errorCount,
+        totalCustomers: allCustomers.length
       }
     } catch (error) {
       console.error('Error in risk re-evaluation:', error)
@@ -1327,19 +1375,18 @@ export const customerService = {
       }
       
       // Calculate new risk score with updated rules
-      const riskScore = calculateRiskScore(customer)
-      const riskLevel = riskScore >= 70 ? 'High' : riskScore >= 40 ? 'Medium' : 'Low'
+      const riskResult = await calculateRiskScore(customer)
       
       // Update customer with new risk score
       await customerService.updateCustomer(customerId, {
-        risk_score: riskScore,
-        risk_level: riskLevel
+        risk_score: riskResult.score,
+        risk_level: riskResult.level
       })
       
       return { 
         success: true, 
         message: 'Risk score updated successfully',
-        data: { risk_score: riskScore, risk_level: riskLevel }
+        data: { risk_score: riskResult.score, risk_level: riskResult.level }
       }
     } catch (error) {
       console.error('Error re-evaluating customer risk score:', error)
@@ -1593,6 +1640,7 @@ export const customerService = {
             pep: naturalPersonDetails.pep_status,
             // Dual nationality & passport details
             isDualNationality: naturalPersonDetails.is_dual_nationality,
+            dualNationalityCountry: naturalPersonDetails.dual_nationality,
             dualNationality: naturalPersonDetails.dual_nationality,
             dualPassportNumber: naturalPersonDetails.dual_passport_number,
             dualPassportIssueDate: naturalPersonDetails.dual_passport_issue_date,
@@ -1744,6 +1792,7 @@ export const customerService = {
               pep: naturalPersonDetails.pep_status,
               // Dual nationality & passport details
               isDualNationality: naturalPersonDetails.is_dual_nationality,
+              dualNationalityCountry: naturalPersonDetails.dual_nationality,
               dualNationality: naturalPersonDetails.dual_nationality,
               dualPassportNumber: naturalPersonDetails.dual_passport_number,
               dualPassportIssueDate: naturalPersonDetails.dual_passport_issue_date,
@@ -1784,9 +1833,36 @@ export const customerService = {
               licenseNumber: legalEntityDetails.license_number,
               licenseIssueDate: legalEntityDetails.license_issue_date,
               licenseExpiryDate: legalEntityDetails.license_expiry_date,
-              businessActivity: legalEntityDetails.business_activity,
-              countriesOfOperation: legalEntityDetails.countries_of_operation,
-              countriesSourceOfFunds: legalEntityDetails.countries_source_of_funds,
+              businessActivity: (() => {
+                try {
+                  const parsed = typeof legalEntityDetails.business_activity === 'string' && legalEntityDetails.business_activity
+                    ? JSON.parse(legalEntityDetails.business_activity)
+                    : legalEntityDetails.business_activity;
+                  return Array.isArray(parsed) ? parsed : (parsed ? [parsed] : []);
+                } catch (e) {
+                  return legalEntityDetails.business_activity ? [legalEntityDetails.business_activity] : [];
+                }
+              })(),
+              countriesOfOperation: (() => {
+                try {
+                  const parsed = typeof legalEntityDetails.countries_of_operation === 'string' && legalEntityDetails.countries_of_operation
+                    ? JSON.parse(legalEntityDetails.countries_of_operation)
+                    : legalEntityDetails.countries_of_operation;
+                  return Array.isArray(parsed) ? parsed : (parsed ? [parsed] : []);
+                } catch (e) {
+                  return legalEntityDetails.countries_of_operation ? [legalEntityDetails.countries_of_operation] : [];
+                }
+              })(),
+              countriesSourceOfFunds: (() => {
+                try {
+                  const parsed = typeof legalEntityDetails.countries_source_of_funds === 'string' && legalEntityDetails.countries_source_of_funds
+                    ? JSON.parse(legalEntityDetails.countries_source_of_funds)
+                    : legalEntityDetails.countries_source_of_funds;
+                  return Array.isArray(parsed) ? parsed : (parsed ? [parsed] : []);
+                } catch (e) {
+                  return legalEntityDetails.countries_source_of_funds ? [legalEntityDetails.countries_source_of_funds] : [];
+                }
+              })(),
               sourceOfFunds: legalEntityDetails.source_of_funds,
               registeredOfficeAddress: legalEntityDetails.registered_office_address,
               email: legalEntityDetails.email,
@@ -1905,14 +1981,14 @@ export const customerService = {
             expected_income_range: shareholder.expectedIncome,
             pep_status: shareholder.pep,
             // Dual nationality & passport details
-            dual_nationality: shareholder.dualNationality,
+            dual_nationality: shareholder.dualNationalityCountry || shareholder.dualNationality || null,
             is_dual_nationality: shareholder.isDualNationality || false,
-            dual_passport_number: shareholder.dualPassportNumber ,
+            dual_passport_number: shareholder.dualPassportNumber || null,
             dual_passport_issue_date: shareholder.dualPassportIssueDate || null,
             dual_passport_expiry_date: shareholder.dualPassportExpiryDate || null,
             // ID details
-            id_type: shareholder.idType,
-            id_number: shareholder.idNumber,
+            id_type: shareholder.idType || null,
+            id_number: shareholder.idNumber || null,
             id_issue_date: shareholder.idIssueDate || null,
             id_expiry_date: shareholder.idExpiryDate || null,
             // Flags
@@ -1941,9 +2017,15 @@ export const customerService = {
             license_number: shareholder.licenseNumber,
             license_issue_date: shareholder.licenseIssueDate || null,
             license_expiry_date: shareholder.licenseExpiryDate || null,
-            business_activity: shareholder.businessActivity,
-            countries_of_operation: shareholder.countriesOfOperation,
-            countries_source_of_funds: shareholder.countriesSourceOfFunds,
+            business_activity: Array.isArray(shareholder.businessActivity) 
+              ? JSON.stringify(shareholder.businessActivity) 
+              : shareholder.businessActivity,
+            countries_of_operation: Array.isArray(shareholder.countriesOfOperation) 
+              ? JSON.stringify(shareholder.countriesOfOperation) 
+              : shareholder.countriesOfOperation,
+            countries_source_of_funds: Array.isArray(shareholder.countriesSourceOfFunds) 
+              ? JSON.stringify(shareholder.countriesSourceOfFunds) 
+              : shareholder.countriesSourceOfFunds,
             source_of_funds: shareholder.sourceOfFunds,
             registered_office_address: shareholder.registeredOfficeAddress,
             email: shareholder.email,
@@ -2170,17 +2252,6 @@ export const customerService = {
         dateOfBirth: director.date_of_birth,
         phone: director.phone,
         placeOfBirth: director.place_of_birth,
-        // Dual nationality & passport details
-        isDualNationality: director.is_dual_nationality,
-        dualNationality: director.dual_nationality,
-        dualPassportNumber: director.dual_passport_number,
-        dualPassportIssueDate: director.dual_passport_issue_date,
-        dualPassportExpiryDate: director.dual_passport_expiry_date,
-        // ID details
-        idType: director.id_type,
-        idNumber: director.id_number,
-        idIssueDate: director.id_issue_date,
-        idExpiryDate: director.id_expiry_date,
         email: director.email,
         address: director.address,
         city: director.city,
@@ -2188,6 +2259,7 @@ export const customerService = {
         pepStatus: director.pep_status,
         isCeo: director.is_ceo,
         isRepresentative: director.is_representative,
+        dualNationality: director.dual_nationality
       }));
 
       return { 
@@ -2236,17 +2308,6 @@ export const customerService = {
         dateOfBirth: director.date_of_birth,
         phone: director.phone,
         placeOfBirth: director.place_of_birth,
-         // Dual nationality & passport details
-         isDualNationality: director.is_dual_nationality,
-         dualNationality: director.dual_nationality,
-         dualPassportNumber: director.dual_passport_number,
-         dualPassportIssueDate: director.dual_passport_issue_date,
-         dualPassportExpiryDate: director.dual_passport_expiry_date,
-         // ID details
-         idType: director.id_type,
-         idNumber: director.id_number,
-         idIssueDate: director.id_issue_date,
-         idExpiryDate: director.id_expiry_date,
         email: director.email,
         address: director.address,
         city: director.city,
@@ -2254,6 +2315,7 @@ export const customerService = {
         pepStatus: director.pep_status,
         isCeo: director.is_ceo,
         isRepresentative: director.is_representative,
+        dualNationality: director.dual_nationality
       };
 
       return { 
@@ -2333,16 +2395,6 @@ export const customerService = {
         date_of_birth: director.dateOfBirth || null,
         phone: director.phone,
         place_of_birth: director.placeOfBirth,
-        dual_nationality: director.dualNationality ,
-        is_dual_nationality: director.isDualNationality ,
-        dual_passport_number: director.dualPassportNumber ,
-        dual_passport_issue_date: director.dualPassportIssueDate || null,
-        dual_passport_expiry_date: director.dualPassportExpiryDate || null,
-        // ID details
-        id_type: director.idType,
-        id_number: director.idNumber ,
-        id_issue_date: director.idIssueDate || null,
-        id_expiry_date: director.idExpiryDate || null,
         email: director.email,
         address: director.address,
         city: director.city,
@@ -2350,6 +2402,7 @@ export const customerService = {
         pep_status: director.pepStatus,
         is_ceo: director.isCeo,
         is_representative: director.isRepresentative,
+        dual_nationality: director.dualNationality
       }))
       
       console.log('👔 Final directors payload:', directorsPayload)
@@ -2519,16 +2572,6 @@ export const customerService = {
         nationality: ubo.nationality || '',
         date_of_birth: ubo.dateOfBirth || null,
         place_of_birth: ubo.placeOfBirth || '',
-        // Dual nationality & passport details
-        is_dual_nationality: ubo.isDualNationality || false,
-        dual_passport_number: ubo.dualPassportNumber || '',
-        dual_passport_issue_date: ubo.dualPassportIssueDate || '',
-        dual_passport_expiry_date: ubo.dualPassportExpiryDate || '',
-        // ID details
-        id_type: ubo.idType || '',
-        id_number: ubo.idNumber || '',
-        id_issue_date: ubo.idIssueDate || '',
-        id_expiry_date: ubo.idExpiryDate || '',
         phone: ubo.phone || '',
         email: ubo.email || '',
         address: ubo.address || '',
@@ -2601,16 +2644,6 @@ export const customerService = {
         nationality: ubo.nationality || '',
         dateOfBirth: ubo.date_of_birth || '',
         placeOfBirth: ubo.place_of_birth || '',
-        // Dual nationality & passport details
-        isDualNationality: ubo.is_dual_nationality|| '',
-        dualPassportNumber: ubo.dual_passport_number|| '',
-        dualPassportIssueDate: ubo.dual_passport_issue_date|| '',
-        dualPassportExpiryDate: ubo.dual_passport_expiry_date|| '',
-        // ID details
-        idType: ubo.id_type|| '',
-        idNumber: ubo.id_number|| '',
-        idIssueDate: ubo.id_issue_date|| '',
-        idExpiryDate: ubo.id_expiry_date|| '',
         phone: ubo.phone || '',
         email: ubo.email || '',
         address: ubo.address || '',
@@ -2675,15 +2708,6 @@ export const customerService = {
         nationality: ubo.nationality || '',
         dateOfBirth: ubo.date_of_birth || '',
         placeOfBirth: ubo.place_of_birth || '',
-        isDualNationality: ubo.is_dual_nationality|| '',
-        dualPassportNumber: ubo.dual_passport_number|| '',
-        dualPassportIssueDate: ubo.dual_passport_issue_date|| '',
-        dualPassportExpiryDate: ubo.dual_passport_expiry_date|| '',
-        // ID details
-        idType: ubo.id_type|| '',
-        idNumber: ubo.id_number|| '',
-        idIssueDate: ubo.id_issue_date|| '',
-        idExpiryDate: ubo.id_expiry_date|| '',
         phone: ubo.phone || '',
         email: ubo.email || '',
         address: ubo.address || '',
@@ -2787,44 +2811,146 @@ export const customerService = {
   calculateAndUpdateRiskScore: async (customerId, completeCustomerData) => {
     try {
       console.log('🔄 Calculating risk score for customer:', customerId)
+      console.log('📊 Customer data structure:', {
+        customerType: completeCustomerData?.customer_type,
+        hasNaturalPersonDetails: !!completeCustomerData?.natural_person_details,
+        hasLegalEntityDetails: !!completeCustomerData?.legal_entity_details,
+        hasShareholders: !!(completeCustomerData?.shareholders && completeCustomerData.shareholders.length > 0)
+      })
+      
+      // Transform nested data structure to flat structure expected by calculateRiskScore
+      let flattenedData = {
+        customerType: completeCustomerData.customer_type || completeCustomerData.customer_type,
+        customer_type: completeCustomerData.customer_type,
+        ...completeCustomerData
+      }
+      
+      // Flatten natural person details
+      if (completeCustomerData.natural_person_details) {
+        const np = completeCustomerData.natural_person_details
+        flattenedData = {
+          ...flattenedData,
+          profession: np.profession,
+          nationality: np.nationality,
+          residencyStatus: np.residencystatus || np.residency_status,
+          dualNationality: np.dualinationality || np.dual_nationality,
+          isDualNationality: np.isdualnationality || np.is_dual_nationality,
+          occupation: np.occupation,
+          pep: np.pep || np.pep_status,
+          countryOfBirth: np.countryofbirth || np.country_of_birth,
+          sourceOfFunds: np.sourceoffunds || np.source_of_funds
+        }
+      }
+      
+      // Flatten legal entity details
+      if (completeCustomerData.legal_entity_details) {
+        const le = completeCustomerData.legal_entity_details
+        flattenedData = {
+          ...flattenedData,
+          businessActivity: le.businessactivity || le.business_activity,
+          countryOfIncorporation: le.countryofincorporation || le.country_of_incorporation,
+          licenseType: le.licensetype || le.license_type,
+          countriesSourceOfFunds: le.countriessourceoffunds || le.countries_source_of_funds,
+          countriesOfOperation: le.countriesofoperation || le.countries_of_operation,
+          jurisdiction: le.jurisdiction,
+          sourceOfFunds: le.sourceoffunds || le.source_of_funds,
+          residencyStatus: le.residencystatus || le.residency_status,
+          licenseCategory: le.licensecategory || le.license_category
+        }
+      }
+      
+      // Transform shareholders to expected format
+      if (completeCustomerData.shareholders && Array.isArray(completeCustomerData.shareholders)) {
+        flattenedData.shareholders = completeCustomerData.shareholders.map(sh => {
+          const shareholder = {
+            shareholderType: sh.type || sh.entity_type,
+            type: sh.type || sh.entity_type,
+            entity_type: sh.entity_type || sh.type,
+            ...sh
+          }
+          
+          // Add natural person shareholder fields
+          if (sh.type === 'Natural Person' || sh.entity_type === 'Natural Person') {
+            shareholder.countryOfResidence = sh.countryOfResidence || sh.country_of_residence
+            shareholder.nationality = sh.nationality
+            shareholder.placeOfBirth = sh.placeOfBirth || sh.place_of_birth
+            shareholder.dualNationality = sh.dualNationality || sh.dual_nationality
+            shareholder.isDualNationality = sh.isDualNationality || sh.is_dual_nationality
+            shareholder.occupation = sh.occupation
+            shareholder.pep = sh.pep || sh.pep_status
+            shareholder.sourceOfFunds = sh.sourceOfFunds || sh.source_of_funds
+          }
+          
+          // Add legal entity shareholder fields
+          if (sh.type === 'Legal Entities' || sh.entity_type === 'Legal Entities') {
+            shareholder.businessActivity = sh.businessActivity || sh.business_activity
+            shareholder.countryOfIncorporation = sh.countryOfIncorporation || sh.country_of_incorporation
+            shareholder.licenseType = sh.licenseType || sh.license_type
+            shareholder.countriesSourceOfFunds = sh.countriesSourceOfFunds || sh.countries_source_of_funds
+            shareholder.countriesOfOperation = sh.countriesOfOperation || sh.countries_of_operation
+            shareholder.sourceOfFunds = sh.sourceOfFunds || sh.source_of_funds
+          }
+          
+          return shareholder
+        })
+      }
+      
+      console.log('📋 Flattened data for risk calculation:', {
+        customerType: flattenedData.customerType || flattenedData.customer_type,
+        hasShareholders: !!(flattenedData.shareholders && flattenedData.shareholders.length > 0),
+        sampleFields: {
+          nationality: flattenedData.nationality,
+          occupation: flattenedData.occupation,
+          businessActivity: flattenedData.businessActivity
+        }
+      })
       
       if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
         // Mock implementation
         console.log('🔧 Using mock risk calculation (Supabase not configured)')
-        const riskScore = calculateRiskScore(completeCustomerData)
-        const riskLevel = riskScore >= 70 ? 'High' : riskScore >= 40 ? 'Medium' : 'Low'
+        const riskResult = await calculateRiskScore(flattenedData)
         
         await new Promise(resolve => setTimeout(resolve, 500))
         
         return { 
           success: true, 
-          data: { risk_score: riskScore, risk_level: riskLevel },
+          data: { risk_score: riskResult.score, risk_level: riskResult.level },
           message: 'Risk score calculated successfully (Mock Mode)'
         }
       }
       
       // Real Supabase implementation
-      const riskScore = calculateRiskScore(completeCustomerData)
-      const riskLevel = riskScore >= 70 ? 'High' : riskScore >= 40 ? 'Medium' : 'Low'
+      const riskResult = await calculateRiskScore(flattenedData)
+      
+      console.log('📊 Risk calculation result:', {
+        score: riskResult.score,
+        level: riskResult.level,
+        triggeredRules: riskResult.triggeredRules?.length || 0
+      })
       
       // Determine due diligence level based on risk (KYC status remains Pending)
       let dueDiligenceLevel = 'Standard'
       
-      if (riskLevel === 'High') {
+      if (riskResult.level === 'High' || riskResult.level === 'Medium High') {
         dueDiligenceLevel = 'Enhanced'
-      } else if (riskLevel === 'Medium') {
+      } else if (riskResult.level === 'Medium' || riskResult.level === 'Medium Low') {
         dueDiligenceLevel = 'Standard'
       } else {
         dueDiligenceLevel = 'Basic'
       }
       
       // Update customer with calculated values (keeping KYC status as Pending)
+      // Round risk score to 2 decimal places for storage (database column is NUMERIC(5,2))
+      const roundedScore = Math.round(riskResult.score * 100) / 100
+      
       const updateData = {
-        risk_score: riskScore,
-        risk_level: riskLevel,
+        risk_score: roundedScore,
+        risk_level: riskResult.level,
         due_diligence_level: dueDiligenceLevel,
         updated_at: new Date().toISOString()
       }
+      
+      console.log('💾 Updating customer with risk data:', updateData)
       
       const result = await supabase
         .from('customers')
@@ -2833,8 +2959,11 @@ export const customerService = {
         .select()
       
       if (result.error) {
+        console.error('❌ Database update error:', result.error)
         throw new Error(result.error.message)
       }
+      
+      console.log('✅ Customer updated successfully:', result.data?.[0])
       
       return { 
         success: true, 

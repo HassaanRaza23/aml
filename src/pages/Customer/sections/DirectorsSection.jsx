@@ -1,7 +1,7 @@
 import React, { useState, useImperativeHandle, forwardRef } from "react";
 import { countries } from "../../../data/countries";
 import { occupations } from "../../../data/occupations";
-import { pepOptions, idTypes } from "../../../data/dropdownOptions";
+import { pepOptions } from "../../../data/dropdownOptions";
 import { customerService } from "../../../services/customerService";
 
 // Parse phone number for edit mode (split country code and phone number)
@@ -41,14 +41,6 @@ const DirectorsSection = forwardRef(({ directors = [], onDirectorsChange, isEdit
     nationality: "",
     dateOfBirth: "",
     placeOfBirth: "",
-    idType: "",
-    idNumber: "",
-    idIssueDate: "",
-    idExpiryDate: "",
-    isDualNationality: false,
-    dualPassportNumber: "",
-    dualPassportIssueDate: "",
-    dualPassportExpiryDate: "",
     countryCode: "+971",
     phone: "",
     email: "",
@@ -160,14 +152,6 @@ const DirectorsSection = forwardRef(({ directors = [], onDirectorsChange, isEdit
         nationality: "",
         dateOfBirth: "",
         placeOfBirth: "",
-        idType: "",
-        idNumber: "",
-        idIssueDate: "",
-        idExpiryDate: "",
-        isDualNationality: false,
-        dualPassportNumber: "",
-        dualPassportIssueDate: "",
-        dualPassportExpiryDate: "",
         countryCode: "+971",
         phone: "",
         email: "",
@@ -317,14 +301,6 @@ const DirectorsSection = forwardRef(({ directors = [], onDirectorsChange, isEdit
       nationality: "",
       dateOfBirth: "",
       placeOfBirth: "",
-      idType: "",
-      idNumber: "",
-      idIssueDate: "",
-      idExpiryDate: "",
-      isDualNationality: false,
-      dualPassportNumber: "",
-      dualPassportIssueDate: "",
-      dualPassportExpiryDate: "",
       countryCode: "+971",
       phone: "",
       email: "",
@@ -354,16 +330,6 @@ const DirectorsSection = forwardRef(({ directors = [], onDirectorsChange, isEdit
       nationality: directorData.nationality || '',
       dateOfBirth: directorData.dateOfBirth || '',
       placeOfBirth: directorData.placeOfBirth || '',
-      isDualNationality: directorData.isDualNationality|| '',
-      dualNationality: directorData.dualNationality|| '',
-      dualPassportNumber: directorData.dualPassportNumber|| '',
-      dualPassportIssueDate: directorData.dualPassportIssueDate|| '',
-      dualPassportExpiryDate: directorData.dualPassportExpiryDate|| '',
-      // ID details
-      idType: directorData.idType|| '',
-      idNumber: directorData.idNumber|| '',
-      idIssueDate: directorData.idIssueDate| '',
-      idExpiryDate: directorData.idExpiryDate|| '',
       countryCode: countryCode || '+971',
       phone: phone || '',
       email: directorData.email || '',
@@ -371,6 +337,7 @@ const DirectorsSection = forwardRef(({ directors = [], onDirectorsChange, isEdit
       city: directorData.city || '',
       occupation: directorData.occupation || '',
       pepStatus: directorData.pepStatus || '',
+      dualNationality: directorData.dualNationality || '',
       isCeo: directorData.isCeo || false,
       isRepresentative: directorData.isRepresentative || false
     });
@@ -557,135 +524,6 @@ const DirectorsSection = forwardRef(({ directors = [], onDirectorsChange, isEdit
                     <p className="text-red-500 text-sm mt-1">{errors.dateOfBirth}</p>
                   )}
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Place of Birth</label>
-                  <select 
-                    className="input"
-                    value={currentDirector.placeOfBirth}
-                    onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
-                  >
-                    <option value="">Select Place of Birth</option>
-                    {countries.map((country) => (
-                      <option key={country.code} value={country.code}>{country.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Type</label>
-                  <select
-                    className="input"
-                    value={currentDirector.idType}
-                    onChange={(e) => setCurrentDirector(prev => ({ ...prev, idType: e.target.value }))}
-                  >
-                    <option value="">Select ID Type</option>
-                    {idTypes.map((type) => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
-                  <input
-                    className="input"
-                    value={currentDirector.idNumber}
-                    onChange={(e) => setCurrentDirector(prev => ({ ...prev, idNumber: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Issue Date</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={currentDirector.idIssueDate}
-                    onChange={(e) => setCurrentDirector(prev => ({ ...prev, idIssueDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ID Expiry Date</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={currentDirector.idExpiryDate}
-                    onChange={(e) => setCurrentDirector(prev => ({ ...prev, idExpiryDate: e.target.value }))}
-                  />
-                </div>
-                <div className="flex items-center space-x-2 mt-2">
-                  <input
-                    type="checkbox"
-                    id="sh-is-dual-nationality"
-                    checked={currentDirector.isDualNationality}
-                    onChange={(e) =>
-                      setCurrentDirector(prev => ({ ...prev, isDualNationality: e.target.checked }))
-                    }
-                  />
-                  <label htmlFor="sh-is-dual-nationality" className="text-sm font-medium text-gray-700">
-                    Is Dual Nationality?
-                  </label>
-                </div>
-                {currentDirector.isDualNationality && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Dual Nationality</label>
-                      <select
-                        className={`input ${errors.dualNationality && touched.dualNationality ? 'border-red-500' : ''}`}
-                        value={currentDirector.dualNationality}
-                        onChange={(e) => handleInputChange('dualNationality', e.target.value)}
-                        onBlur={() => handleFieldBlur('dualNationality')}
-                      >
-                        <option value="">Select Dual Nationality</option>
-                        {countries.map((country) => (
-                          <option key={country.code} value={country.code}>
-                            {country.name}
-                          </option>
-                        ))}
-                      </select>
-                      {errors.dualNationality && touched.dualNationality && (
-                        <p className="text-red-500 text-sm mt-1">{errors.dualNationality}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Number</label>
-                      <input
-                        className={`input ${errors.dualPassportNumber && touched.dualPassportNumber ? 'border-red-500' : ''}`}
-                        value={currentDirector.dualPassportNumber}
-                        onChange={(e) => handleInputChange('dualPassportNumber', e.target.value)}
-                        onBlur={() => handleFieldBlur('dualPassportNumber')}
-                      />
-                      {errors.dualPassportNumber && touched.dualPassportNumber && (
-                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportNumber}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Issue Date</label>
-                      <input
-                        type="date"
-                        className={`input ${errors.dualPassportIssueDate && touched.dualPassportIssueDate ? 'border-red-500' : ''}`}
-                        value={currentDirector.dualPassportIssueDate}
-                        onChange={(e) => handleInputChange('dualPassportIssueDate', e.target.value)}
-                        onBlur={() => handleFieldBlur('dualPassportIssueDate')}
-                      />
-                      {errors.dualPassportIssueDate && touched.dualPassportIssueDate && (
-                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportIssueDate}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Passport Expiry Date</label>
-                      <input
-                        type="date"
-                        className={`input ${errors.dualPassportExpiryDate && touched.dualPassportExpiryDate ? 'border-red-500' : ''}`}
-                        value={currentDirector.dualPassportExpiryDate}
-                        onChange={(e) => handleInputChange('dualPassportExpiryDate', e.target.value)}
-                        onBlur={() => handleFieldBlur('dualPassportExpiryDate')}
-                      />
-                      {errors.dualPassportExpiryDate && touched.dualPassportExpiryDate && (
-                        <p className="text-red-500 text-sm mt-1">{errors.dualPassportExpiryDate}</p>
-                      )}
-                    </div>
-                  </>
-                )}
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                   <div className="flex gap-2">
@@ -728,6 +566,19 @@ const DirectorsSection = forwardRef(({ directors = [], onDirectorsChange, isEdit
                   {errors.phone && touched.phone && (
                     <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
                   )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Place of Birth</label>
+                  <select 
+                    className="input"
+                    value={currentDirector.placeOfBirth}
+                    onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
+                  >
+                    <option value="">Select Place of Birth</option>
+                    {countries.map((country) => (
+                      <option key={country.code} value={country.code}>{country.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -784,8 +635,20 @@ const DirectorsSection = forwardRef(({ directors = [], onDirectorsChange, isEdit
                      ))}
                    </select>
                  </div>
-                
-                  <div className="flex items-center space-x-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Dual Nationality</label>
+                  <select 
+                    className="input"
+                    value={currentDirector.dualNationality}
+                    onChange={(e) => handleInputChange('dualNationality', e.target.value)}
+                  >
+                    <option value="">Select Dual Nationality</option>
+                    {countries.map((country) => (
+                      <option key={country.code} value={country.code}>{country.name}</option>
+                    ))}
+                  </select>
+                </div>
+                                 <div className="flex items-center space-x-2">
                    <input 
                      type="checkbox" 
                      id="isCeo"

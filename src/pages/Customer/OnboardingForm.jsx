@@ -753,47 +753,55 @@ const OnboardingForm = ({
           const customerId = result.data.id;
           
                       try {
-              // Save type-specific detail data
-              console.log('🔍 Detail data check:', detailData);
-              console.log('🔍 Detail data type:', typeof detailData);
-              console.log('🔍 Detail data length:', detailData ? Object.keys(detailData).length : 'undefined');
-              
-              if (detailData) {
-              console.log('💾 Attempting to save detail data:', detailData);
+            // Save all data in parallel (detail data + section data)
+            // All operations are independent and can run concurrently
+            const savePromises = []
+            
+            // Add detail data save to parallel operations
+            if (detailData) {
               if (formData.customerType === "Natural Person") {
-                console.log('👤 Saving Natural Person details...');
-                const npResult = await customerService.saveNaturalPersonDetails(customerId, detailData);
-                console.log('👤 Natural Person save result:', npResult);
-                if (!npResult.success) {
-                  throw new Error(`Failed to save Natural Person details: ${npResult.error}`);
-                }
+                savePromises.push(
+                  customerService.saveNaturalPersonDetails(customerId, detailData)
+                    .then(result => {
+                      if (!result.success) {
+                        throw new Error(`Failed to save Natural Person details: ${result.error}`)
+                      }
+                      return result
+                    })
+                )
               } else if (formData.customerType === "Legal Entities") {
-                console.log('🏢 Saving Legal Entity details...');
-                const leResult = await customerService.saveLegalEntityDetails(customerId, detailData);
-                console.log('🏢 Legal Entity save result:', leResult);
-                if (!leResult.success) {
-                  throw new Error(`Failed to save Legal Entity details: ${leResult.error}`);
-                }
+                savePromises.push(
+                  customerService.saveLegalEntityDetails(customerId, detailData)
+                    .then(result => {
+                      if (!result.success) {
+                        throw new Error(`Failed to save Legal Entity details: ${result.error}`)
+                      }
+                      return result
+                    })
+                )
               }
-            } else {
-              console.log('⚠️ No detail data to save');
             }
             
-            // Save section data
+            // Add section data saves to parallel operations
             if (shareholders.length > 0) {
-              await customerService.saveShareholders(customerId, shareholders);
+              savePromises.push(customerService.saveShareholders(customerId, shareholders))
             }
             
             if (directors.length > 0) {
-              await customerService.saveDirectors(customerId, directors);
+              savePromises.push(customerService.saveDirectors(customerId, directors))
             }
             
             if (bankDetails.length > 0) {
-              await customerService.saveBankDetails(customerId, bankDetails);
+              savePromises.push(customerService.saveBankDetails(customerId, bankDetails))
             }
             
             if (ubos.length > 0) {
-              await customerService.saveUbos(customerId, ubos);
+              savePromises.push(customerService.saveUbos(customerId, ubos))
+            }
+            
+            // Execute all saves in parallel
+            if (savePromises.length > 0) {
+              await Promise.all(savePromises)
             }
             
             // Calculate risk score and update customer with all data available
@@ -836,7 +844,7 @@ const OnboardingForm = ({
 
       <form onSubmit={handleSubmit}>
         {/* Common Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Core System ID <span className="text-red-500">*</span>
@@ -864,7 +872,7 @@ const OnboardingForm = ({
             >
               <option value="Natural Person">Natural Person</option>
               <option value="Legal Entities">Legal Entities</option>
-            </select>
+        </select>
           </div>
         </div>
 
@@ -912,7 +920,7 @@ const OnboardingForm = ({
               Phone <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
-              <select
+            <select
                 className="border border-gray-300 rounded-md px-3 py-2 text-sm w-32"
                 value={formData.countryCode || '+971'}
                 onChange={(e) => {
@@ -923,12 +931,12 @@ const OnboardingForm = ({
                   .filter(country => country.phone && country.phone.length <= 6)
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((country) => (
-                    <option key={country.code} value={country.phone}>
-                      {country.phone} ({country.code})
-                    </option>
-                  ))}
-              </select>
-              <input
+                <option key={country.code} value={country.phone}>
+                    {country.phone} ({country.code})
+                </option>
+                ))}
+            </select>
+            <input
                 type="tel"
                 className={`flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm ${errors.phone && touched.phone ? 'border-red-500' : ''}`}
                 value={formData.phone || ''}
@@ -945,7 +953,7 @@ const OnboardingForm = ({
                 }}
                 placeholder="Enter phone number"
                 maxLength={15}
-              />
+            />
             </div>
             {errors.phone && touched.phone && (
               <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
@@ -965,7 +973,7 @@ const OnboardingForm = ({
             {errors.city && touched.city && (
               <p className="text-red-500 text-sm mt-1">{errors.city}</p>
             )}
-          </div>
+        </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -980,11 +988,11 @@ const OnboardingForm = ({
               <option value="">Select Channel</option>
               <option value="Face to Face">Face to Face</option>
               <option value="Non Face to Face">Non Face to Face</option>
-            </select>
+        </select>
             {errors.channel && touched.channel && (
               <p className="text-red-500 text-sm mt-1">{errors.channel}</p>
             )}
-          </div>
+        </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -997,12 +1005,12 @@ const OnboardingForm = ({
               onBlur={() => handleFieldBlur('transactionProduct')}
             >
               <option value="">Select Transaction Product</option>
-              {transactionProducts.map((product) => (
+          {transactionProducts.map((product) => (
                 <option key={product} value={product}>
                   {product}
                 </option>
-              ))}
-            </select>
+          ))}
+        </select>
             {errors.transactionProduct && touched.transactionProduct && (
               <p className="text-red-500 text-sm mt-1">{errors.transactionProduct}</p>
             )}
@@ -1045,10 +1053,10 @@ const OnboardingForm = ({
               <p className="text-red-500 text-sm mt-1">{errors.transactionLimit}</p>
             )}
           </div>
-        </div>
+      </div>
 
-        {/* Expandable Sections */}
-        <div className="mt-6 space-y-4">
+      {/* Expandable Sections */}
+      <div className="mt-6 space-y-4">
           {/* Shareholders Section - Only show for Legal Entities */}
           {formData.customerType === "Legal Entities" && (
             <ShareholdersSection 
@@ -1086,10 +1094,10 @@ const OnboardingForm = ({
               isEdit={isEdit}
             />
           )}
-        </div>
+      </div>
 
         {/* Submit Button */}
-        <div className="mt-6">
+      <div className="mt-6">
           <div className="flex gap-4">
             {isEdit && onCancel && (
               <button
@@ -1116,8 +1124,8 @@ const OnboardingForm = ({
               ) : (
                 isEdit ? "Update Customer" : "Create Customer"
               )}
-            </button>
-          </div>
+        </button>
+      </div>
         </div>
       </form>
     </div>

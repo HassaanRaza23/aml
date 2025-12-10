@@ -13,6 +13,8 @@ const RiskProfile = () => {
   const [riskFactors, setRiskFactors] = useState([]);
   const [calculatedRiskLevel, setCalculatedRiskLevel] = useState("Low");
   const [calculatedScore, setCalculatedScore] = useState(0);
+  const [triggeredRules, setTriggeredRules] = useState([]);
+  const [calculationBreakdown, setCalculationBreakdown] = useState(null);
 
   // Manual override state
   const [overrideLevel, setOverrideLevel] = useState("");
@@ -29,86 +31,370 @@ const RiskProfile = () => {
         if (result) {
           setCustomerData(result);
           
+          // Transform nested data structure to flat structure expected by calculateRiskScore
+          let flattenedData = {
+            customerType: result.customer_type || result.customer_type,
+            customer_type: result.customer_type,
+            ...result
+          }
+          
+          // Flatten natural person details
+          if (result.natural_person_details) {
+            const np = result.natural_person_details
+            flattenedData = {
+              ...flattenedData,
+              profession: np.profession,
+              nationality: np.nationality,
+              residencyStatus: np.residencystatus || np.residency_status,
+              dualNationality: np.dualinationality || np.dual_nationality,
+              // Handle isDualNationality: if undefined/null, default to false (No)
+              isDualNationality: np.isdualnationality !== undefined && np.isdualnationality !== null 
+                ? np.isdualnationality 
+                : (np.is_dual_nationality !== undefined && np.is_dual_nationality !== null 
+                  ? np.is_dual_nationality 
+                  : false), // Default to false (No) if not set
+              occupation: np.occupation,
+              pep: np.pep || np.pep_status,
+              countryOfBirth: np.countryofbirth || np.country_of_birth,
+              sourceOfFunds: np.sourceoffunds || np.source_of_funds
+            }
+            
+            // Debug: Log all natural person fields
+            console.log('🔍 Natural Person Fields for Risk Calculation:', {
+              profession: flattenedData.profession,
+              nationality: flattenedData.nationality,
+              residencyStatus: flattenedData.residencyStatus,
+              dualNationality: flattenedData.dualNationality,
+              isDualNationality: flattenedData.isDualNationality,
+              occupation: flattenedData.occupation,
+              pep: flattenedData.pep,
+              countryOfBirth: flattenedData.countryOfBirth,
+              sourceOfFunds: flattenedData.sourceOfFunds,
+              rawData: np
+            })
+          }
+          
+          // Flatten legal entity details
+          if (result.legal_entity_details) {
+            const le = result.legal_entity_details
+            flattenedData = {
+              ...flattenedData,
+              businessActivity: le.businessactivity || le.business_activity,
+              countryOfIncorporation: le.countryofincorporation || le.country_of_incorporation,
+              licenseType: le.licensetype || le.license_type,
+              countriesSourceOfFunds: le.countriessourceoffunds || le.countries_source_of_funds,
+              countriesOfOperation: le.countriesofoperation || le.countries_of_operation,
+              jurisdiction: le.jurisdiction,
+              sourceOfFunds: le.sourceoffunds || le.source_of_funds,
+              residencyStatus: le.residencystatus || le.residency_status,
+              licenseCategory: le.licensecategory || le.license_category
+            }
+          }
+          
+          // Transform shareholders to expected format
+          if (result.shareholders && Array.isArray(result.shareholders)) {
+            flattenedData.shareholders = result.shareholders.map(sh => {
+              const shareholder = {
+                shareholderType: sh.type || sh.entity_type,
+                type: sh.type || sh.entity_type,
+                entity_type: sh.entity_type || sh.type,
+                ...sh
+              }
+              
+              // Add natural person shareholder fields
+              if (sh.type === 'Natural Person' || sh.entity_type === 'Natural Person') {
+                shareholder.countryOfResidence = sh.countryOfResidence || sh.country_of_residence
+                shareholder.nationality = sh.nationality
+                shareholder.placeOfBirth = sh.placeOfBirth || sh.place_of_birth
+                shareholder.dualNationality = sh.dualNationality || sh.dual_nationality
+                shareholder.isDualNationality = sh.isDualNationality || sh.is_dual_nationality
+                shareholder.occupation = sh.occupation
+                shareholder.pep = sh.pep || sh.pep_status
+                shareholder.sourceOfFunds = sh.sourceOfFunds || sh.source_of_funds
+              }
+              
+              // Add legal entity shareholder fields
+              if (sh.type === 'Legal Entities' || sh.entity_type === 'Legal Entities') {
+                shareholder.businessActivity = sh.businessActivity || sh.business_activity
+                shareholder.countryOfIncorporation = sh.countryOfIncorporation || sh.country_of_incorporation
+                shareholder.licenseType = sh.licenseType || sh.license_type
+                shareholder.countriesSourceOfFunds = sh.countriesSourceOfFunds || sh.countries_source_of_funds
+                shareholder.countriesOfOperation = sh.countriesOfOperation || sh.countries_of_operation
+                shareholder.sourceOfFunds = sh.sourceOfFunds || sh.source_of_funds
+              }
+              
+              return shareholder
+            })
+          }
+          
           // Calculate risk score and factors
-          const riskCalculation = calculateRiskScoreWithBreakdown(result);
-          const triggeredRules = getTriggeredRules(result);
+          const riskCalculation = await calculateRiskScore(flattenedData);
+          const rules = riskCalculation.triggeredRules || [];
           
           setCalculatedScore(riskCalculation.score);
           setCalculatedRiskLevel(riskCalculation.level);
+          setTriggeredRules(rules);
           
-          // Build risk factors array from triggered rules with scores
-          const factors = triggeredRules.map(rule => ({
-            factor: rule.name,
-            value: 'Yes', // Rule was triggered
-            risk: getRiskLevel(rule.score),
-            score: rule.score
-          }));
+          // Calculate breakdown
+          const totalScore = rules.reduce((sum, rule) => sum + rule.score, 0);
+          const ruleCount = rules.length;
+          const averageScore = ruleCount > 0 ? totalScore / ruleCount : 0;
           
-          // Add additional risk factors based on customer data
-          if (result.nationality) {
-            const nationalityRisk = ["IR", "KP", "CU", "VE", "SY"].includes(result.nationality) ? 30 : 0;
-            factors.push({
-              factor: "Nationality",
-              value: result.nationality,
-              risk: nationalityRisk > 0 ? "High" : "Low",
-              score: nationalityRisk
-            });
+          // Group rules by category
+          const rulesByCategory = {};
+          rules.forEach(rule => {
+            if (!rulesByCategory[rule.category]) {
+              rulesByCategory[rule.category] = [];
+            }
+            rulesByCategory[rule.category].push(rule);
+          });
+          
+          setCalculationBreakdown({
+            totalScore,
+            ruleCount,
+            averageScore,
+            rulesByCategory
+          });
+          
+          // Define field mappings (same as in riskCalculation.js)
+          const NATURAL_PERSON_FIELD_MAPPING = {
+            profession: 'BUSINESS ACTIVITY',
+            nationality: 'Nationality',
+            residencyStatus: 'RESIDENCY STATUS',
+            dualNationality: 'Dual Nationality Countries',
+            isDualNationality: 'Dual Nationality',
+            occupation: 'BUSINESS ACTIVITY',
+            pep: 'PEP',
+            countryOfBirth: 'Country Of Birth',
+            sourceOfFunds: 'SOURCE OF FUND',
+          };
+          
+          const LEGAL_ENTITY_FIELD_MAPPING = {
+            businessActivity: 'BUSINESS ACTIVITY',
+            countryOfIncorporation: 'Country Of Incorporation',
+            licenseType: 'LICENSE TYPE',
+            countriesSourceOfFunds: 'Countries Source Of Funds',
+            countriesOfOperation: 'OPERATION COUNTRIES',
+            jurisdiction: 'JURISDICTION',
+            sourceOfFunds: 'SOURCE OF FUND',
+            residencyStatus: 'RESIDENCY STATUS',
+            licenseCategory: 'LICENSE CATEGORY',
+          };
+          
+          const SHAREHOLDER_NATURAL_PERSON_FIELD_MAPPING = {
+            countryOfResidence: 'Country Of Residence',
+            nationality: 'Nationality',
+            placeOfBirth: 'Country Of Birth',
+            dualNationality: 'Dual Nationality Countries',
+            isDualNationality: 'Dual Nationality',
+            occupation: 'BUSINESS ACTIVITY',
+            pep: 'PEP',
+            sourceOfFunds: 'SOURCE OF FUND',
+          };
+          
+          const SHAREHOLDER_LEGAL_ENTITY_FIELD_MAPPING = {
+            businessActivity: 'BUSINESS ACTIVITY',
+            countryOfIncorporation: 'Country Of Incorporation',
+            licenseType: 'LICENSE TYPE',
+            countriesSourceOfFunds: 'Countries Source Of Funds',
+            countriesOfOperation: 'OPERATION COUNTRIES',
+            sourceOfFunds: 'SOURCE OF FUND',
+          };
+          
+          // Get the appropriate field mapping based on customer type
+          const customerType = result.customer_type || result.customerType;
+          const mainFieldMapping = customerType === 'Natural Person' 
+            ? NATURAL_PERSON_FIELD_MAPPING 
+            : LEGAL_ENTITY_FIELD_MAPPING;
+          
+          // Create a map of triggered rules by field name for quick lookup
+          const rulesByFieldName = new Map();
+          rules.forEach(rule => {
+            if (rule.fieldName) {
+              if (!rulesByFieldName.has(rule.fieldName)) {
+                rulesByFieldName.set(rule.fieldName, []);
+              }
+              rulesByFieldName.get(rule.fieldName).push(rule);
+            }
+          });
+          
+          // Build risk factors array - include ALL fields that have values, even if no rule matched
+          const factors = [];
+          
+          // Helper function to format field name
+          const formatFieldName = (fieldName) => {
+            return fieldName
+              .replace(/([A-Z])/g, ' $1')
+              .replace(/^./, str => str.toUpperCase())
+              .trim();
+          };
+          
+          // Process main customer fields
+          for (const [fieldName, categoryName] of Object.entries(mainFieldMapping)) {
+            const fieldValue = flattenedData[fieldName];
+            
+            // Always check isDualNationality, other fields only if they have a value
+            const shouldInclude = (fieldValue !== undefined && fieldValue !== null && fieldValue !== '' && 
+              !(Array.isArray(fieldValue) && fieldValue.length === 0)) 
+              || fieldName === 'isDualNationality';
+            
+            if (shouldInclude) {
+              const fieldNameDisplay = formatFieldName(fieldName);
+              
+              // Check if this field has matching rules
+              const fieldRules = rulesByFieldName.get(fieldName) || [];
+              
+              if (fieldRules.length > 0) {
+                // Add each matching rule
+                fieldRules.forEach(rule => {
+                  factors.push({
+                    fieldName: fieldNameDisplay,
+                    ruleName: rule.name.trim(),
+                    riskScore: rule.score,
+                    riskLevel: getRiskLevel(rule.score),
+                    category: rule.category
+                  });
+                });
+              } else {
+                // No rule matched, but still show the field
+                factors.push({
+                  fieldName: fieldNameDisplay,
+                  ruleName: 'No match',
+                  riskScore: 0,
+                  riskLevel: 'N/A',
+                  category: categoryName
+                });
+              }
+            }
           }
           
-          if (result.source_of_funds) {
-            const sourceRisk = ["Unknown", "Cash"].includes(result.source_of_funds) ? 20 : 0;
-            factors.push({
-              factor: "Source of Funds",
-              value: result.source_of_funds,
-              risk: sourceRisk > 0 ? "Medium" : "Low",
-              score: sourceRisk
-            });
-          }
-          
-          if (result.occupation) {
-            const occupationRisk = ["Politician", "Government Official", "Military", "Cash Business"].includes(result.occupation) ? 25 : 0;
-            factors.push({
-              factor: "Occupation",
-              value: result.occupation,
-              risk: occupationRisk > 0 ? "High" : "Low",
-              score: occupationRisk
-            });
-          }
-          
-          if (result.source_of_wealth) {
-            const wealthRisk = ["Unknown", "Cash Business"].includes(result.source_of_wealth) ? 20 : 0;
-            factors.push({
-              factor: "Source of Wealth",
-              value: result.source_of_wealth,
-              risk: wealthRisk > 0 ? "Medium" : "Low",
-              score: wealthRisk
-            });
-          }
-          
-          if (result.pep_status) {
-            const pepRisk = result.pep_status === "Yes" ? 40 : 0;
-            factors.push({
-              factor: "PEP Status",
-              value: result.pep_status,
-              risk: pepRisk > 0 ? "High" : "Low",
-              score: pepRisk
+          // Process shareholder fields - show each shareholder individually with numbered heading
+          if (result.shareholders && Array.isArray(result.shareholders)) {
+            result.shareholders.forEach((shareholder, shareholderIndex) => {
+              const shareholderType = shareholder.shareholderType || shareholder.type || shareholder.entity_type;
+              const shareholderFieldMapping = shareholderType === 'Natural Person'
+                ? SHAREHOLDER_NATURAL_PERSON_FIELD_MAPPING
+                : SHAREHOLDER_LEGAL_ENTITY_FIELD_MAPPING;
+              
+              // Add heading for this shareholder (numbered)
+              factors.push({
+                fieldName: `Shareholder ${shareholderIndex + 1}`,
+                ruleName: '',
+                riskScore: 0,
+                riskLevel: '',
+                category: '',
+                isHeading: true
+              });
+              
+              // Check shareholder type - show once per shareholder
+              const shareholderTypeFieldKey = `shareholder.type.${shareholderType}.${shareholderIndex}`;
+              const shareholderTypeRules = rulesByFieldName.get(shareholderTypeFieldKey) || [];
+              // Also check without index for backward compatibility
+              const shareholderTypeRulesAlt = rulesByFieldName.get(`shareholder.type.${shareholderType}`) || [];
+              const allTypeRules = [...shareholderTypeRules, ...shareholderTypeRulesAlt];
+              
+              if (shareholderType) {
+                if (allTypeRules.length > 0) {
+                  // Only add unique rules (by rule name) to avoid duplicates
+                  const uniqueRules = new Map();
+                  allTypeRules.forEach(rule => {
+                    if (!uniqueRules.has(rule.name)) {
+                      uniqueRules.set(rule.name, rule);
+                    }
+                  });
+                  uniqueRules.forEach(rule => {
+                    factors.push({
+                      fieldName: 'Type',
+                      ruleName: rule.name.trim(),
+                      riskScore: rule.score,
+                      riskLevel: getRiskLevel(rule.score),
+                      category: rule.category,
+                      isHeading: false
+                    });
+                  });
+                } else {
+                  factors.push({
+                    fieldName: 'Type',
+                    ruleName: 'No match',
+                    riskScore: 0,
+                    riskLevel: 'N/A',
+                    category: 'CUSTOMER TYPE',
+                    isHeading: false
+                  });
+                }
+              }
+              
+              // Check other shareholder fields
+              for (const [fieldName, categoryName] of Object.entries(shareholderFieldMapping)) {
+                const fieldValue = shareholder[fieldName];
+                
+                // Always check isDualNationality, other fields only if they have a value
+                const shouldInclude = (fieldValue !== undefined && fieldValue !== null && fieldValue !== '' &&
+                  !(Array.isArray(fieldValue) && fieldValue.length === 0))
+                  || fieldName === 'isDualNationality';
+                
+                // Skip dualNationality if isDualNationality is not Yes
+                if (fieldName === 'dualNationality') {
+                  const isDualNationalityValue = shareholder.isDualNationality;
+                  if (isDualNationalityValue !== true && isDualNationalityValue !== 'Yes' && isDualNationalityValue !== 'yes') {
+                    continue;
+                  }
+                }
+                
+                if (shouldInclude) {
+                  // Support both indexed and non-indexed keys from riskCalculation triggeredByField
+                  const indexedKey = `shareholder.${shareholderIndex}.${fieldName}`;
+                  const unindexedKey = `shareholder.${fieldName}`;
+                  const fieldRules = [
+                    ...(rulesByFieldName.get(indexedKey) || []),
+                    ...(rulesByFieldName.get(unindexedKey) || [])
+                  ];
+                  
+                  const fieldNameDisplay = formatFieldName(fieldName);
+                  
+                  if (fieldRules.length > 0) {
+                    // Add each matching rule
+                    fieldRules.forEach(rule => {
+                      factors.push({
+                        fieldName: fieldNameDisplay,
+                        ruleName: rule.name.trim(),
+                        riskScore: rule.score,
+                        riskLevel: getRiskLevel(rule.score),
+                        category: rule.category,
+                        isHeading: false
+                      });
+                    });
+                  } else {
+                    // No rule matched, but still show the field
+                    factors.push({
+                      fieldName: fieldNameDisplay,
+                      ruleName: 'No match',
+                      riskScore: 0,
+                      riskLevel: 'N/A',
+                      category: categoryName,
+                      isHeading: false
+                    });
+                  }
+                }
+              }
             });
           }
           
           setRiskFactors(factors);
           
-          // Load existing risk override
-          try {
-            const overrideResult = await riskService.getRiskProfileOverride(customerId);
-            if (overrideResult) {
-              setExistingOverride(overrideResult);
-              setOverrideLevel(overrideResult.override_risk_level);
-              setOverrideReason(overrideResult.justification);
-            }
-          } catch (error) {
-            console.error("Error loading risk override:", error);
-            // Continue without override data
-          }
+          // Load existing risk override (if function exists)
+          // Note: This function may not exist in riskService, so we'll skip it for now
+          // try {
+          //   const overrideResult = await riskService.getRiskProfileOverride(customerId);
+          //   if (overrideResult) {
+          //     setExistingOverride(overrideResult);
+          //     setOverrideLevel(overrideResult.override_risk_level);
+          //     setOverrideReason(overrideResult.justification);
+          //   }
+          // } catch (error) {
+          //   console.error("Error loading risk override:", error);
+          //   // Continue without override data
+          // }
         } else {
           setError("Customer not found");
         }
@@ -235,33 +521,53 @@ const RiskProfile = () => {
         <table className="w-full border text-sm">
           <thead className="bg-gray-100 text-left">
             <tr>
-              <th className="p-2 border">Factor</th>
-              <th className="p-2 border">Value</th>
+              <th className="p-2 border">Field Name</th>
+              <th className="p-2 border">Rule Name</th>
+              <th className="p-2 border">Risk Score</th>
               <th className="p-2 border">Risk Level</th>
-              <th className="p-2 border">Score</th>
             </tr>
           </thead>
           <tbody>
-            {riskFactors.map((item, index) => (
+            {riskFactors.map((item, index) => {
+              // If this is a heading row, render it differently
+              if (item.isHeading) {
+                return (
+                  <tr key={index} className="bg-gray-100">
+                    <td colSpan="4" className="p-3 border font-semibold text-gray-800">
+                      {item.fieldName}
+                    </td>
+                  </tr>
+                );
+              }
+              
+              // Regular data row
+              return (
               <tr key={index}>
-                <td className="p-2 border">{item.factor}</td>
-                <td className="p-2 border">{item.value}</td>
+                  <td className="p-2 border pl-6">{item.fieldName}</td>
+                  <td className={`p-2 border ${item.ruleName === 'No match' ? 'text-gray-400 italic' : ''}`}>
+                    {item.ruleName}
+                  </td>
+                  <td className="p-2 border text-center font-medium">
+                    {item.riskScore > 0 ? item.riskScore : '-'}
+                  </td>
                 <td
                   className={`p-2 border font-medium ${
-                    item.risk === "High"
+                      item.riskLevel === "N/A"
+                        ? "text-gray-400"
+                        : item.riskLevel === "High" || item.riskLevel === "Medium High"
                       ? "text-red-600"
-                      : item.risk === "Medium"
+                        : item.riskLevel === "Medium"
                       ? "text-yellow-600"
+                        : item.riskLevel === "Medium Low"
+                        ? "text-blue-600"
                       : "text-green-600"
                   }`}
                 >
-                  {item.risk}
-                </td>
-                <td className="p-2 border text-center font-medium">
-                  {item.score > 0 ? item.score : "N/A"}
+                    {item.riskLevel}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -271,23 +577,107 @@ const RiskProfile = () => {
         <h2 className="text-xl font-semibold mb-2">Calculated Risk Level</h2>
         <div
           className={`text-3xl font-bold ${
-            calculatedRiskLevel === "High"
+            calculatedRiskLevel === "High" || calculatedRiskLevel === "Medium High"
               ? "text-red-600"
               : calculatedRiskLevel === "Medium"
               ? "text-yellow-500"
+              : calculatedRiskLevel === "Medium Low"
+              ? "text-blue-600"
               : "text-green-600"
           }`}
         >
           {calculatedRiskLevel} Risk
         </div>
-        <div className="text-sm text-gray-600">Score: {calculatedScore} / 100</div>
+        <div className="text-sm text-gray-600 mt-2">
+          <span className="font-semibold">Risk Score:</span> {calculatedScore.toFixed(2)} / 5.00
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          Based on {calculationBreakdown?.ruleCount || 0} triggered rule{calculationBreakdown?.ruleCount !== 1 ? 's' : ''}
+        </div>
       </div>
+      
+      {/* Risk Calculation Breakdown */}
+      {calculationBreakdown && (
+        <div className="mb-6 bg-gray-50 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Risk Score Calculation</h2>
+          
+          {/* Calculation Formula */}
+          <div className="mb-4 p-4 bg-white rounded-lg border">
+            <h3 className="font-medium mb-2 text-gray-700">Calculation Formula</h3>
+            <div className="text-sm text-gray-600 space-y-1">
+              <p><strong>Total Score:</strong> Sum of all triggered rule scores = {calculationBreakdown.totalScore.toFixed(2)}</p>
+              <p><strong>Rule Count:</strong> Number of triggered rules = {calculationBreakdown.ruleCount}</p>
+              <p className="font-semibold text-gray-800">
+                <strong>Average Score:</strong> Total Score ÷ Rule Count = {calculationBreakdown.averageScore.toFixed(2)}
+              </p>
+            </div>
+          </div>
+          
+          {/* Risk Level Mapping */}
+          <div className="mb-4 p-4 bg-white rounded-lg border">
+            <h3 className="font-medium mb-2 text-gray-700">Risk Level Determination</h3>
+            <div className="text-sm space-y-1">
+              <div className={`p-2 rounded ${calculatedScore >= 0 && calculatedScore <= 1 ? 'bg-green-100' : 'bg-gray-50'}`}>
+                <span className="font-medium">0 to 1 (inclusive):</span> Low Risk
+                {calculatedScore >= 0 && calculatedScore <= 1 && <span className="ml-2 text-green-700 font-semibold">← Current</span>}
+              </div>
+              <div className={`p-2 rounded ${calculatedScore > 1 && calculatedScore <= 2 ? 'bg-blue-100' : 'bg-gray-50'}`}>
+                <span className="font-medium">&gt;1 to 2 (inclusive):</span> Medium Low Risk
+                {calculatedScore > 1 && calculatedScore <= 2 && <span className="ml-2 text-blue-700 font-semibold">← Current</span>}
+              </div>
+              <div className={`p-2 rounded ${calculatedScore > 2 && calculatedScore <= 3 ? 'bg-yellow-100' : 'bg-gray-50'}`}>
+                <span className="font-medium">&gt;2 to 3 (inclusive):</span> Medium Risk
+                {calculatedScore > 2 && calculatedScore <= 3 && <span className="ml-2 text-yellow-700 font-semibold">← Current</span>}
+              </div>
+              <div className={`p-2 rounded ${calculatedScore > 3 && calculatedScore <= 4 ? 'bg-orange-100' : 'bg-gray-50'}`}>
+                <span className="font-medium">&gt;3 to 4 (inclusive):</span> Medium High Risk
+                {calculatedScore > 3 && calculatedScore <= 4 && <span className="ml-2 text-orange-700 font-semibold">← Current</span>}
+              </div>
+              <div className={`p-2 rounded ${calculatedScore > 4 && calculatedScore <= 5 ? 'bg-red-100' : 'bg-gray-50'}`}>
+                <span className="font-medium">&gt;4 to 5 (inclusive):</span> High Risk
+                {calculatedScore > 4 && calculatedScore <= 5 && <span className="ml-2 text-red-700 font-semibold">← Current</span>}
+              </div>
+            </div>
+          </div>
+          
+          {/* Triggered Rules by Category */}
+          {Object.keys(calculationBreakdown.rulesByCategory).length > 0 && (
+            <div className="mt-4">
+              <h3 className="font-medium mb-3 text-gray-700">Triggered Rules by Category</h3>
+              {Object.entries(calculationBreakdown.rulesByCategory).map(([category, rules]) => (
+                <div key={category} className="mb-4 p-4 bg-white rounded-lg border">
+                  <h4 className="font-semibold text-gray-800 mb-2">{category}</h4>
+                  <div className="space-y-2">
+                    {rules.map((rule, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-800">{rule.name}</p>
+                        </div>
+                        <div className="ml-4 text-right">
+                          <span className="text-sm font-semibold text-blue-600">Score: {rule.score}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t border-gray-200 mt-2">
+                      <p className="text-sm text-gray-600">
+                        <strong>Category Total:</strong> {rules.reduce((sum, r) => sum + r.score, 0)} points from {rules.length} rule{rules.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      
 
       {/* Override Section */}
-      <div className="my-6">
+      {/* <div className="my-6">
         <h2 className="text-xl font-semibold mb-2">Manual Override</h2>
         
-        {/* Show existing override if any */}
+        {/* Show existing override if any 
         {existingOverride && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
             <div className="flex items-center mb-2">
@@ -314,7 +704,9 @@ const RiskProfile = () => {
         >
           <option value="">-- Select --</option>
           <option value="Low">Low</option>
+          <option value="Medium Low">Medium Low</option>
           <option value="Medium">Medium</option>
+          <option value="Medium High">Medium High</option>
           <option value="High">High</option>
         </select>
 
@@ -326,17 +718,17 @@ const RiskProfile = () => {
           onChange={(e) => setOverrideReason(e.target.value)}
           placeholder="Explain why you're overriding the system's decision"
         ></textarea>
-      </div>
+      </div> */}
 
       {/* Save Button */}
-      <div className="text-right">
+      {/* <div className="text-right">
         <button
           onClick={handleSave}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Save Risk Profile
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };

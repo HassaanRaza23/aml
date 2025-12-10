@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, Fragment, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { customerService } from "../../services";
@@ -20,9 +20,9 @@ const CustomerList = () => {
   const [customerToDelete, setCustomerToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const handleSort = (field) => {
+  const handleSort = useCallback((field) => {
     setSortBy((prev) => (prev === field ? "" : field));
-  };
+  }, []);
 
   // Fetch customers on component mount
   useEffect(() => {
@@ -46,14 +46,20 @@ const CustomerList = () => {
     fetchCustomers();
   }, []);
 
-  const handleFilterChange = (type, value) => {
+  const handleFilterChange = useCallback((type, value) => {
     setFilters((prev) => ({ ...prev, [type]: value }));
-  };
+  }, []);
 
   // Handle risk re-evaluation
-  const handleReEvaluateRisk = async () => {
+  const handleReEvaluateRisk = useCallback(async () => {
     try {
       setReEvaluating(true);
+      
+      // Show initial toast
+      toast.info('🔄 Starting risk re-evaluation for all customers...', {
+        autoClose: 2000
+      });
+      
       const result = await customerService.reEvaluateAllRiskScores();
       
       if (result.success) {
@@ -62,20 +68,28 @@ const CustomerList = () => {
         if (refreshResult.success) {
           setCustomers(refreshResult.data);
         }
-        toast.success(`✅ ${result.message}\nUpdated: ${result.updatedCount} customers\nErrors: ${result.errorCount}`);
+        
+        // Show detailed success message
+        const message = result.errorCount > 0
+          ? `✅ Re-evaluation completed!\n✅ Updated: ${result.updatedCount} customers\n⚠️ Errors: ${result.errorCount} customers\n📊 Total: ${result.totalCustomers || result.updatedCount + result.errorCount} customers`
+          : `✅ Re-evaluation completed successfully!\n✅ Updated: ${result.updatedCount} customers\n📊 Total: ${result.totalCustomers || result.updatedCount} customers`;
+        
+        toast.success(message, {
+          autoClose: 5000
+        });
       } else {
-        toast.error(`❌ Error: ${result.error}`);
+        toast.error(`❌ Error: ${result.error || 'Failed to re-evaluate risk scores'}`);
       }
     } catch (error) {
       console.error('Error re-evaluating risk scores:', error);
-      toast.error('❌ Failed to re-evaluate risk scores');
+      toast.error(`❌ Failed to re-evaluate risk scores: ${error.message || 'Unknown error'}`);
     } finally {
       setReEvaluating(false);
     }
-  };
+  }, []);
 
   // Handle row expansion
-  const handleRowClick = (customerId) => {
+  const handleRowClick = useCallback((customerId) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
       if (newSet.has(customerId)) {
@@ -85,10 +99,10 @@ const CustomerList = () => {
       }
       return newSet;
     });
-  };
+  }, []);
 
   // Handle edit customer
-  const handleEdit = async (customer) => {
+  const handleEdit = useCallback(async (customer) => {
     try {
       // Fetch all related data for this customer including expandable sections
       const fullCustomerData = await customerService.getCustomerById(customer.id);
@@ -97,8 +111,6 @@ const CustomerList = () => {
         console.error('Failed to fetch customer data for editing');
         return;
       }
-      
-      console.log('🔍 Full customer data for editing:', fullCustomerData);
       
       // Flatten the normalized data to match the old form structure
       const flattenedCustomer = {
@@ -284,8 +296,6 @@ const CustomerList = () => {
         }))
       };
       
-      console.log('✅ Flattened customer data for editing:', flattenedCustomer);
-      
       setSelectedCustomer(flattenedCustomer);
       setShowEditModal(true);
       setExpandedRows(new Set()); // Close expansion
@@ -293,29 +303,29 @@ const CustomerList = () => {
       console.error('Error preparing customer data for editing:', error);
       toast.error('Failed to load customer data for editing. Please try again.');
     }
-  };
+  }, []);
 
   // Handle KYC review
-  const handleKYC = (customerId) => {
+  const handleKYC = useCallback((customerId) => {
     navigate(`/customer/kyc/${customerId}`);
     setExpandedRows(new Set());
-  };
+  }, [navigate]);
 
   // Handle risk profile
-  const handleRisk = (customerId) => {
+  const handleRisk = useCallback((customerId) => {
     navigate(`/customer/risk-profile/${customerId}`);
     setExpandedRows(new Set());
-  };
+  }, [navigate]);
 
   // Handle customer update
-  const handleUpdateCustomer = async (updatedData) => {
+  const handleUpdateCustomer = useCallback(async (updatedData) => {
     try {
       if (!selectedCustomer) return { success: false, error: 'No customer selected' };
 
       const result = await customerService.updateCustomer(selectedCustomer.id, updatedData);
       
       if (result.success) {
-        // Refresh the customer list
+        // Refresh customer list to get updated data (since structure might be complex)
         const refreshResult = await customerService.getCustomers();
         if (refreshResult.success) {
           setCustomers(refreshResult.data);
@@ -333,10 +343,10 @@ const CustomerList = () => {
       console.error('Error updating customer:', error);
       return { success: false, error: error.message || 'Failed to update customer' };
     }
-  };
+  }, [selectedCustomer]);
 
   // Handle delete customer
-  const handleDeleteCustomer = async () => {
+  const handleDeleteCustomer = useCallback(async () => {
     if (!customerToDelete) return;
     
     try {
@@ -344,11 +354,10 @@ const CustomerList = () => {
       const result = await customerService.deleteCustomer(customerToDelete.id);
       
       if (result.success) {
-        // Refresh the customer list
-        const refreshResult = await customerService.getCustomers();
-        if (refreshResult.success) {
-          setCustomers(refreshResult.data);
-        }
+        // Optimistically remove customer from list instead of full refetch
+        setCustomers(prevCustomers => 
+          prevCustomers.filter(customer => customer.id !== customerToDelete.id)
+        );
         
         // Close modal and show success message
         setShowDeleteModal(false);
@@ -363,71 +372,57 @@ const CustomerList = () => {
     } finally {
       setDeleting(false);
     }
-  };
+  }, [customerToDelete]);
 
   // Show delete confirmation modal
-  const showDeleteConfirmation = (customer) => {
+  const showDeleteConfirmation = useCallback((customer) => {
     setCustomerToDelete(customer);
     setShowDeleteModal(true);
-  };
+  }, []);
 
-  // Transform customer data for display
-  const transformCustomerData = (customer) => {
-    console.log('🔍 Transforming customer:', customer);
-    console.log('📋 Customer type:', customer.customer_type);
-    console.log('👤 Natural person details:', customer.natural_person_details);
-    console.log('🏢 Legal entity details:', customer.legal_entity_details);
-    console.log('🔍 Customer type comparison:', {
-      isNaturalPerson: customer.customer_type === 'Natural Person',
-      isLegalEntities: customer.customer_type === 'Legal Entities',
-      hasNaturalPersonDetails: !!customer.natural_person_details,
-      hasLegalEntityDetails: !!customer.legal_entity_details
-    });
-    
-    let fullName = 'Unnamed Customer';
-    
-    if (customer.customer_type === 'Natural Person' && customer.natural_person_details) {
-      const firstName = customer.natural_person_details.firstname || '';
-      const lastName = customer.natural_person_details.lastname || '';
-      fullName = `${firstName} ${lastName}`.trim();
-      console.log('👤 Natural person name:', fullName);
-    } else if (customer.customer_type === 'Legal Entities' && customer.legal_entity_details) {
-      fullName = customer.legal_entity_details.legalname || 'Legal Entity';
-      console.log('🏢 Legal entity name:', fullName);
-    }
-    
-    // If still unnamed, try to get name from other fields
-    if (fullName === 'Unnamed Customer' || fullName.trim() === '') {
-      if (customer.first_name && customer.last_name) {
-        fullName = `${customer.first_name} ${customer.last_name}`.trim();
-        console.log('🔍 Fallback to old fields:', fullName);
-      } else if (customer.first_name) {
-        fullName = customer.first_name;
-        console.log('🔍 Fallback to first_name only:', fullName);
-      } else if (customer.alias) {
-        fullName = customer.alias;
-        console.log('🔍 Fallback to alias:', fullName);
+  // Transform customer data for display (memoized)
+  const transformedCustomers = useMemo(() => {
+    return customers.map((customer) => {
+      let fullName = 'Unnamed Customer';
+      
+      if (customer.customer_type === 'Natural Person' && customer.natural_person_details) {
+        const firstName = customer.natural_person_details.firstname || '';
+        const lastName = customer.natural_person_details.lastname || '';
+        fullName = `${firstName} ${lastName}`.trim();
+      } else if (customer.customer_type === 'Legal Entities' && customer.legal_entity_details) {
+        fullName = customer.legal_entity_details.legalname || 'Legal Entity';
       }
-    }
-    
-    const result = {
-      id: customer.id,
-      name: fullName || 'Unnamed Customer',
-      customer_type: customer.customer_type,
-      risk: customer.risk_level || 'Low',
-      kyc: customer.kyc_status || 'Pending',
-      date: customer.created_at ? new Date(customer.created_at).toISOString().split('T')[0] : 'N/A',
-      email: customer.email,
-      phone: customer.phone
-    };
-    
-    console.log('✅ Final result:', result);
-    return result;
-  };
+      
+      // If still unnamed, try to get name from other fields
+      if (fullName === 'Unnamed Customer' || fullName.trim() === '') {
+        if (customer.first_name && customer.last_name) {
+          fullName = `${customer.first_name} ${customer.last_name}`.trim();
+        } else if (customer.first_name) {
+          fullName = customer.first_name;
+        } else if (customer.alias) {
+          fullName = customer.alias;
+        }
+      }
+      
+      return {
+        id: customer.id,
+        name: fullName || 'Unnamed Customer',
+        customer_type: customer.customer_type,
+        risk: customer.risk_level || 'Low',
+        kyc: customer.kyc_status || 'Pending',
+        date: customer.created_at ? new Date(customer.created_at).toISOString().split('T')[0] : 'N/A',
+        email: customer.email,
+        phone: customer.phone
+      };
+    });
+  }, [customers]);
 
-  const filtered = customers
-    .map(transformCustomerData)
-    .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+  // Filter and sort customers (memoized)
+  const filtered = useMemo(() => {
+    const searchLower = search.toLowerCase();
+    
+    return transformedCustomers
+      .filter((c) => c.name.toLowerCase().includes(searchLower))
     .filter((c) => (filters.risk ? c.risk === filters.risk : true))
     .filter((c) => (filters.kyc ? c.kyc === filters.kyc : true))
     .sort((a, b) => {
@@ -435,6 +430,7 @@ const CustomerList = () => {
       if (sortBy === "date") return new Date(b.date) - new Date(a.date);
       return a[sortBy].localeCompare(b[sortBy]);
     });
+  }, [transformedCustomers, search, filters, sortBy]);
 
   return (
     <div className="p-6 space-y-6">
@@ -468,13 +464,13 @@ const CustomerList = () => {
       {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <input
-            type="text"
-            placeholder="Search customer..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full sm:w-64 border border-gray-300 rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+        <input
+          type="text"
+          placeholder="Search customer..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full sm:w-64 border border-gray-300 rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
           
           <button
             onClick={() => navigate("/customer/onboarding")}
@@ -514,9 +510,11 @@ const CustomerList = () => {
             className="border border-gray-300 rounded-lg px-3 py-2 shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
           >
             <option value="">All Risks</option>
-            <option value="High">High Risk</option>
-            <option value="Medium">Medium Risk</option>
-            <option value="Low">Low Risk</option>
+            <option value="High">High</option>
+            <option value="Medium High">Medium High</option>
+            <option value="Medium">Medium</option>
+            <option value="Medium Low">Medium Low</option>
+            <option value="Low">Low</option>
           </select>
 
           <select
@@ -525,9 +523,10 @@ const CustomerList = () => {
             className="border border-gray-300 rounded-lg px-3 py-2 shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
           >
             <option value="">All KYC</option>
-            <option value="Verified">Verified</option>
+            <option value="Approved">Approved</option>
             <option value="Pending">Pending</option>
             <option value="Rejected">Rejected</option>
+            <option value="Under Review">Under Review</option>
           </select>
         </div>
       </div>
@@ -541,8 +540,8 @@ const CustomerList = () => {
 
       {/* Table */}
       {!loading && !error && (
-        <div className="overflow-auto bg-white rounded-xl shadow border">
-          <table className="min-w-full text-sm text-left">
+      <div className="overflow-auto bg-white rounded-xl shadow border">
+        <table className="min-w-full text-sm text-left">
           <thead>
             <tr className="bg-gray-100 text-gray-700 border-b">
               <th
@@ -586,28 +585,30 @@ const CustomerList = () => {
                   className={`border-b hover:bg-gray-50 transition duration-200 cursor-pointer ${
                     expandedRows.has(cust.id) ? 'bg-blue-50' : ''
                   }`}
-                >
-                  <td className="p-4 font-semibold text-gray-800">{cust.name}</td>
+              >
+                <td className="p-4 font-semibold text-gray-800">{cust.name}</td>
                   <td className="p-4">
                     <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                       {cust.customer_type}
                     </span>
                   </td>
-                  <td className="p-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        cust.risk === "High"
-                          ? "bg-red-100 text-red-700"
-                          : cust.risk === "Medium"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {cust.risk}
-                    </span>
-                  </td>
-                  <td className="p-4 text-gray-700">{cust.kyc}</td>
-                  <td className="p-4 text-gray-600">{cust.date}</td>
+                <td className="p-4">
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      cust.risk === "High" || cust.risk === "Medium High"
+                        ? "bg-red-100 text-red-700"
+                        : cust.risk === "Medium"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : cust.risk === "Medium Low"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {cust.risk}
+                  </span>
+                </td>
+                <td className="p-4 text-gray-700">{cust.kyc}</td>
+                <td className="p-4 text-gray-600">{cust.date}</td>
                 </tr>
                 
                 {/* Expanded Actions Row */}
@@ -642,7 +643,7 @@ const CustomerList = () => {
                         >
                           Risk Profile
                         </button>
-                        <button
+                  <button
                           onClick={(e) => {
                             e.stopPropagation();
                             showDeleteConfirmation(cust);
@@ -650,8 +651,8 @@ const CustomerList = () => {
                           className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
                         >
                           Delete Customer
-                        </button>
-                        <button
+                  </button>
+                  <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setExpandedRows(prev => {
@@ -663,10 +664,10 @@ const CustomerList = () => {
                           className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
                         >
                           Close
-                        </button>
+                  </button>
                       </div>
-                    </td>
-                  </tr>
+                </td>
+              </tr>
                 )}
               </React.Fragment>
             ))}
@@ -676,7 +677,7 @@ const CustomerList = () => {
         {filtered.length === 0 && (
           <div className="p-6 text-gray-500 text-center">No customers found.</div>
         )}
-        </div>
+      </div>
       )}
 
       {/* Edit Customer Modal */}

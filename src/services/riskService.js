@@ -1,46 +1,98 @@
 import { supabase, handleSupabaseError, getCurrentUser, dbHelpers } from '../config/supabase'
-import { riskRules } from '../data/riskRules'
 
 export const riskService = {
   // Get risk rules (from file-based system)
   getRiskRules: async () => {
     try {
+      // Load categories and rules from database
+      const { data: categories, error: categoriesError } = await supabase
+        .from('risk_categories')
+        .select('*')
+
+      if (categoriesError) throw categoriesError
+
+      // Fetch all rules with pagination (Supabase default limit is 1000)
+      let allRules = []
+      let from = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data: rulesPage, error: rulesError } = await supabase
+          .from('risk_rules')
+          .select('*')
+          .range(from, from + pageSize - 1)
+
+        if (rulesError) throw rulesError
+
+        if (rulesPage && rulesPage.length > 0) {
+          allRules = [...allRules, ...rulesPage]
+          from += pageSize
+          hasMore = rulesPage.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
+
+      const rules = allRules
+
+      const categoriesById = new Map(
+        (categories || []).map((c) => [c.id, c])
+      )
+
+      const combinedRules = (rules || []).map((r) => {
+        const category = categoriesById.get(r.category_id)
+        return {
+          id: r.id,
+          ruleText: r.rule_text,
+          riskScore: r.risk_score,
+          riskLogic: r.risk_logic,
+          isActive: r.is_active,
+          sortOrder: r.sort_order,
+          categoryId: r.category_id,
+          categoryName: category?.name || 'Uncategorized',
+          categoryCode: category?.code || null,
+          categoryRuleType: category?.rule_type || null,
+        }
+      })
+
       return {
         success: true,
-        rules: riskRules,
-        total: riskRules.length
+        rules: combinedRules,
+        categories: categories || [],
+        total: combinedRules.length,
       }
     } catch (error) {
-      handleSupabaseError(error)
+      console.error('Error loading risk rules:', error)
+      return {
+        success: false,
+        rules: [],
+        total: 0,
+        error: error.message || 'Failed to load risk rules',
+      }
     }
   },
 
-  // Calculate risk score for customer
+  // Calculate risk score for customer (placeholder using DB rules)
   calculateRiskScore: async (customerData) => {
     try {
-      let score = 0
-      const triggeredRules = []
-      
-      riskRules.forEach(rule => {
-        if (rule.condition(customerData)) {
-          score += rule.score
-          triggeredRules.push({
-            rule: rule.name,
-            score: rule.score,
-            category: rule.category,
-            description: rule.description
-          })
-        }
-      })
-      
-      const riskLevel = score >= 70 ? 'High' : score >= 40 ? 'Medium' : 'Low'
-      
+      // TODO: implement real rule evaluation using onboarding data
+      const { data: rules, error } = await supabase
+        .from('risk_rules')
+        .select('id, risk_score, risk_logic, is_active')
+        .eq('is_active', true)
+
+      if (error) throw error
+
+      // For now, do not change existing behaviour elsewhere – just return a minimal, safe structure.
+      const totalRules = (rules || []).length
+
       return {
         success: true,
-        riskScore: Math.min(score, 100),
-        riskLevel: riskLevel,
-        triggeredRules: triggeredRules,
-        totalRules: riskRules.length
+        riskScore: 0,
+        riskLevel: 'Low',
+        triggeredRules: [],
+        totalRules,
       }
     } catch (error) {
       console.error('Error in calculateRiskScore:', error)
@@ -49,8 +101,8 @@ export const riskService = {
         riskScore: 0,
         riskLevel: 'Low',
         triggeredRules: [],
-        totalRules: riskRules.length,
-        error: error.message || 'Failed to calculate risk score'
+        totalRules: 0,
+        error: error.message || 'Failed to calculate risk score',
       }
     }
   },
@@ -127,69 +179,35 @@ export const riskService = {
     }
   },
 
-  // Get risk assessment history
-  getRiskAssessmentHistory: async (customerId) => {
+  // Create a new risk rule
+  createRiskRule: async (ruleData) => {
     try {
-      const { data: assessments, error } = await supabase
-        .from('risk_assessments')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('assessment_date', { ascending: false })
-      
-      if (error) handleSupabaseError(error)
-      return assessments
-    } catch (error) {
-      handleSupabaseError(error)
-    }
-  },
+      const payload = {
+        category_id: ruleData.categoryId,
+        rule_text: ruleData.ruleText,
+        risk_score: ruleData.riskScore,
+        risk_logic: ruleData.riskLogic,
+        is_active: ruleData.isActive ?? true,
+      }
 
-  // Update risk profile override
-  updateRiskProfileOverride: async (customerId, overrideData) => {
-    try {
-      const user = await getCurrentUser()
-      
-      const overridePayload = {
-        customer_id: customerId,
-        ...overrideData,
-        overridden_by: user.id,
-        overridden_at: new Date().toISOString()
-      }
-      
-      // Check if override exists
-      const { data: existingOverride } = await supabase
-        .from('risk_profile_overrides')
-        .select('id')
-        .eq('customer_id', customerId)
-        .single()
-      
-      if (existingOverride) {
-        await dbHelpers.update('risk_profile_overrides', existingOverride.id, overridePayload)
-      } else {
-        await dbHelpers.insert('risk_profile_overrides', overridePayload)
-      }
-      
-      return { success: true, message: 'Risk profile override updated successfully' }
-    } catch (error) {
-      handleSupabaseError(error)
-    }
-  },
-
-  // Get risk profile override
-  getRiskProfileOverride: async (customerId) => {
-    try {
-      const { data: override, error } = await supabase
-        .from('risk_profile_overrides')
+      const { data, error } = await supabase
+        .from('risk_rules')
+        .insert(payload)
         .select('*')
-        .eq('customer_id', customerId)
         .single()
-      
-      if (error && error.code !== 'PGRST116') {
-        handleSupabaseError(error)
+
+      if (error) throw error
+
+      return {
+        success: true,
+        rule: data,
       }
-      
-      return override || null
     } catch (error) {
-      handleSupabaseError(error)
+      console.error('Error creating risk rule:', error)
+      return {
+        success: false,
+        error: error.message || 'Failed to create risk rule',
+      }
     }
   },
 
@@ -273,20 +291,4 @@ export const riskService = {
     }
   },
 
-  // Get high-risk customers
-  getHighRiskCustomers: async (page = 1, limit = 50) => {
-    try {
-      const options = {
-        page,
-        limit,
-        filters: { risk_level: 'High' },
-        orderBy: { column: 'risk_score', ascending: false }
-      }
-      
-      const result = await dbHelpers.list('customers', options)
-      return result
-    } catch (error) {
-      handleSupabaseError(error)
-    }
-  }
 }

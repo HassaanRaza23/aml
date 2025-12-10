@@ -3,16 +3,16 @@ import { countries } from "../../../data/countries";
 import { occupations } from "../../../data/occupations";
 import {
   entityTypes,
-  businessActivities,
   entityClassTypes,
-  licenseTypes,
   trustTypes,
   trusteeTypes,
   yesNoOptions,
   sourceOfWealth,
   sourceOfFunds,
   pepOptions,
-  idTypes
+  licenseTypes,
+  idTypes,
+  businessActivities
 } from "../../../data/dropdownOptions";
 import { customerService } from "../../../services/customerService";
 
@@ -62,7 +62,7 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
     idIssueDate: "",
     idExpiryDate: "",
     isDualNationality: false,
-    dualNationality: "",
+    dualNationalityCountry: "",
     dualPassportNumber: "",
     dualPassportIssueDate: "",
     dualPassportExpiryDate: "",
@@ -76,6 +76,7 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
     expectedIncome: "",
     pep: "",
     shareholding: "",
+    dualNationality: "",
     isDirector: false,
     isUbo: false
   });
@@ -158,7 +159,7 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           error = "Trust name must be at least 2 characters long";
         }
         break;
-      case "dualNationality":
+      case "dualNationalityCountry":
       case "dualPassportNumber":
       case "dualPassportIssueDate":
       case "dualPassportExpiryDate":
@@ -244,8 +245,29 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
     if (hasRequiredFields) {
       // Combine country code + phone number for storage
       const phoneWithCountryCode = currentShareholder.countryCode + currentShareholder.phone;
+      
+      // Convert arrays to JSON strings for multiselect fields (legal entity only)
+      const processedShareholder = { ...currentShareholder };
+      if (shareholderType === "Legal Entities") {
+        if (Array.isArray(processedShareholder.businessActivity)) {
+          processedShareholder.businessActivity = processedShareholder.businessActivity.length > 0 
+            ? JSON.stringify(processedShareholder.businessActivity) 
+            : "";
+        }
+        if (Array.isArray(processedShareholder.countriesOfOperation)) {
+          processedShareholder.countriesOfOperation = processedShareholder.countriesOfOperation.length > 0 
+            ? JSON.stringify(processedShareholder.countriesOfOperation) 
+            : "";
+        }
+        if (Array.isArray(processedShareholder.countriesSourceOfFunds)) {
+          processedShareholder.countriesSourceOfFunds = processedShareholder.countriesSourceOfFunds.length > 0 
+            ? JSON.stringify(processedShareholder.countriesSourceOfFunds) 
+            : "";
+        }
+      }
+      
       const newShareholder = { 
-        ...currentShareholder, 
+        ...processedShareholder, 
         type: shareholderType,
         phone: phoneWithCountryCode // Store the combined phone number
       };
@@ -262,7 +284,7 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
         onShareholdersChange([...shareholders, newShareholder]);
       }
       
-      // If this shareholder is also a director, fill the director form fields
+            // If this shareholder is also a director, fill the director form fields
       if (newShareholder.isDirector && onDirectorCreate && shareholderType === "Natural Person") {
         const directorData = {
           firstName: newShareholder.fullName ? newShareholder.fullName.split(' ')[0] : '',
@@ -272,14 +294,6 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           nationality: newShareholder.nationality || '',
           dateOfBirth: newShareholder.dateOfBirth || '',
           placeOfBirth: newShareholder.placeOfBirth || '',
-          isDualNationality: newShareholder.isDualNationality|| '',
-          dualPassportNumber: newShareholder.dualPassportNumber|| '',
-          dualPassportIssueDate: newShareholder.dualPassportIssueDate|| '',
-          dualPassportExpiryDate: newShareholder.dualPassportExpiryDate|| '',
-          idType: newShareholder.idType|| '',
-          idNumber: newShareholder.idNumber|| '',
-          idIssueDate: newShareholder.idIssueDate|| '',
-          idExpiryDate: newShareholder.idExpiryDate|| '',
           phone: newShareholder.phone || '',
           email: newShareholder.email || '',
           address: newShareholder.address || '',
@@ -304,14 +318,6 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           nationality: newShareholder.nationality || '',
           dateOfBirth: newShareholder.dateOfBirth || '',
           placeOfBirth: newShareholder.placeOfBirth || '',
-          isDualNationality: newShareholder.isDualNationality|| '',
-          dualPassportNumber: newShareholder.dualPassportNumber|| '',
-          dualPassportIssueDate: newShareholder.dualPassportIssueDate|| '',
-          dualPassportExpiryDate: newShareholder.dualPassportExpiryDate|| '',
-          idType: newShareholder.idType|| '',
-          idNumber: newShareholder.idNumber|| '',
-          idIssueDate: newShareholder.idIssueDate|| '',
-          idExpiryDate: newShareholder.idExpiryDate|| '',
           phone: newShareholder.phone || '',
           email: newShareholder.email || '',
           address: newShareholder.address || '',
@@ -338,14 +344,6 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           nationality: "",
           dateOfBirth: "",
           placeOfBirth: "",
-          idType: "",
-          idNumber: "",
-          idIssueDate: "",
-          idExpiryDate: "",
-          isDualNationality: false,
-          dualPassportNumber: "",
-          dualPassportIssueDate: "",
-          dualPassportExpiryDate: "",
           countryCode: "+971",
           phone: "",
           email: "",
@@ -372,10 +370,10 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           licenseNumber: "",
           licenseIssueDate: "",
           licenseExpiryDate: "",
-          businessActivity: "",
-          countriesOfOperation: "",
+          businessActivity: [],
+          countriesOfOperation: [],
           registeredOfficeAddress: "",
-          countriesSourceOfFunds: "",
+          countriesSourceOfFunds: [],
           otherDetails: "",
           email: "",
           countryCode: "+971",
@@ -455,9 +453,44 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           // Parse phone number to separate country code and phone number
           const { countryCode, phone } = parsePhoneNumber(freshShareholderData.phone || '');
           
+          // Parse JSON strings for multiselect fields (legal entity only)
+          let parsedData = { ...freshShareholderData };
+          if (freshShareholderData.type === 'Legal Entities' || freshShareholderData.entity_type === 'Legal Entities') {
+            // Parse JSON strings to arrays
+            if (typeof parsedData.businessActivity === 'string' && parsedData.businessActivity) {
+              try {
+                parsedData.businessActivity = JSON.parse(parsedData.businessActivity);
+              } catch (e) {
+                parsedData.businessActivity = parsedData.businessActivity ? [parsedData.businessActivity] : [];
+              }
+            } else if (!Array.isArray(parsedData.businessActivity)) {
+              parsedData.businessActivity = [];
+            }
+            
+            if (typeof parsedData.countriesOfOperation === 'string' && parsedData.countriesOfOperation) {
+              try {
+                parsedData.countriesOfOperation = JSON.parse(parsedData.countriesOfOperation);
+              } catch (e) {
+                parsedData.countriesOfOperation = parsedData.countriesOfOperation ? [parsedData.countriesOfOperation] : [];
+              }
+            } else if (!Array.isArray(parsedData.countriesOfOperation)) {
+              parsedData.countriesOfOperation = [];
+            }
+            
+            if (typeof parsedData.countriesSourceOfFunds === 'string' && parsedData.countriesSourceOfFunds) {
+              try {
+                parsedData.countriesSourceOfFunds = JSON.parse(parsedData.countriesSourceOfFunds);
+              } catch (e) {
+                parsedData.countriesSourceOfFunds = parsedData.countriesSourceOfFunds ? [parsedData.countriesSourceOfFunds] : [];
+              }
+            } else if (!Array.isArray(parsedData.countriesSourceOfFunds)) {
+              parsedData.countriesSourceOfFunds = [];
+            }
+          }
+          
           // Use the fresh data from database
           const shareholderWithDefaults = {
-            ...freshShareholderData,
+            ...parsedData,
             countryCode: countryCode || '+971',
             phone: phone || '',
             type: freshShareholderData.type || shareholderToEdit.type || "Natural Person"
@@ -476,8 +509,44 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
           console.error('🔍 Failed to fetch fresh shareholder data:', error);
           // Fallback to existing data if fetch fails
           const { countryCode, phone } = parsePhoneNumber(shareholderToEdit.phone || '');
+          
+          // Parse JSON strings for multiselect fields (legal entity only)
+          let parsedData = { ...shareholderToEdit };
+          if (shareholderToEdit.type === 'Legal Entities' || shareholderToEdit.entity_type === 'Legal Entities') {
+            // Parse JSON strings to arrays
+            if (typeof parsedData.businessActivity === 'string' && parsedData.businessActivity) {
+              try {
+                parsedData.businessActivity = JSON.parse(parsedData.businessActivity);
+              } catch (e) {
+                parsedData.businessActivity = parsedData.businessActivity ? [parsedData.businessActivity] : [];
+              }
+            } else if (!Array.isArray(parsedData.businessActivity)) {
+              parsedData.businessActivity = [];
+            }
+            
+            if (typeof parsedData.countriesOfOperation === 'string' && parsedData.countriesOfOperation) {
+              try {
+                parsedData.countriesOfOperation = JSON.parse(parsedData.countriesOfOperation);
+              } catch (e) {
+                parsedData.countriesOfOperation = parsedData.countriesOfOperation ? [parsedData.countriesOfOperation] : [];
+              }
+            } else if (!Array.isArray(parsedData.countriesOfOperation)) {
+              parsedData.countriesOfOperation = [];
+            }
+            
+            if (typeof parsedData.countriesSourceOfFunds === 'string' && parsedData.countriesSourceOfFunds) {
+              try {
+                parsedData.countriesSourceOfFunds = JSON.parse(parsedData.countriesSourceOfFunds);
+              } catch (e) {
+                parsedData.countriesSourceOfFunds = parsedData.countriesSourceOfFunds ? [parsedData.countriesSourceOfFunds] : [];
+              }
+            } else if (!Array.isArray(parsedData.countriesSourceOfFunds)) {
+              parsedData.countriesSourceOfFunds = [];
+            }
+          }
+          
           const shareholderWithDefaults = {
-            ...shareholderToEdit,
+            ...parsedData,
             countryCode: countryCode || '+971',
             phone: phone || '',
             type: shareholderToEdit.type || "Natural Person"
@@ -491,8 +560,44 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
         console.error('🔍 Error fetching shareholder data:', error);
         // Fallback to existing data if fetch fails
         const { countryCode, phone } = parsePhoneNumber(shareholderToEdit.phone || '');
+        
+        // Parse JSON strings for multiselect fields (legal entity only)
+        let parsedData = { ...shareholderToEdit };
+        if (shareholderToEdit.type === 'Legal Entities' || shareholderToEdit.entity_type === 'Legal Entities') {
+          // Parse JSON strings to arrays
+          if (typeof parsedData.businessActivity === 'string' && parsedData.businessActivity) {
+            try {
+              parsedData.businessActivity = JSON.parse(parsedData.businessActivity);
+            } catch (e) {
+              parsedData.businessActivity = parsedData.businessActivity ? [parsedData.businessActivity] : [];
+            }
+          } else if (!Array.isArray(parsedData.businessActivity)) {
+            parsedData.businessActivity = [];
+          }
+          
+          if (typeof parsedData.countriesOfOperation === 'string' && parsedData.countriesOfOperation) {
+            try {
+              parsedData.countriesOfOperation = JSON.parse(parsedData.countriesOfOperation);
+            } catch (e) {
+              parsedData.countriesOfOperation = parsedData.countriesOfOperation ? [parsedData.countriesOfOperation] : [];
+            }
+          } else if (!Array.isArray(parsedData.countriesOfOperation)) {
+            parsedData.countriesOfOperation = [];
+          }
+          
+          if (typeof parsedData.countriesSourceOfFunds === 'string' && parsedData.countriesSourceOfFunds) {
+            try {
+              parsedData.countriesSourceOfFunds = JSON.parse(parsedData.countriesSourceOfFunds);
+            } catch (e) {
+              parsedData.countriesSourceOfFunds = parsedData.countriesSourceOfFunds ? [parsedData.countriesSourceOfFunds] : [];
+            }
+          } else if (!Array.isArray(parsedData.countriesSourceOfFunds)) {
+            parsedData.countriesSourceOfFunds = [];
+          }
+        }
+        
         const shareholderWithDefaults = {
-          ...shareholderToEdit,
+          ...parsedData,
           countryCode: countryCode || '+971',
           phone: phone || '',
           type: shareholderToEdit.type || "Natural Person"
@@ -509,9 +614,44 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
       // Parse phone number to separate country code and phone number
       const { countryCode, phone } = parsePhoneNumber(shareholderToEdit.phone || '');
       
+      // Parse JSON strings for multiselect fields (legal entity only)
+      let parsedData = { ...shareholderToEdit };
+      if (shareholderToEdit.type === 'Legal Entities' || shareholderToEdit.entity_type === 'Legal Entities') {
+        // Parse JSON strings to arrays
+        if (typeof parsedData.businessActivity === 'string' && parsedData.businessActivity) {
+          try {
+            parsedData.businessActivity = JSON.parse(parsedData.businessActivity);
+          } catch (e) {
+            parsedData.businessActivity = parsedData.businessActivity ? [parsedData.businessActivity] : [];
+          }
+        } else if (!Array.isArray(parsedData.businessActivity)) {
+          parsedData.businessActivity = [];
+        }
+        
+        if (typeof parsedData.countriesOfOperation === 'string' && parsedData.countriesOfOperation) {
+          try {
+            parsedData.countriesOfOperation = JSON.parse(parsedData.countriesOfOperation);
+          } catch (e) {
+            parsedData.countriesOfOperation = parsedData.countriesOfOperation ? [parsedData.countriesOfOperation] : [];
+          }
+        } else if (!Array.isArray(parsedData.countriesOfOperation)) {
+          parsedData.countriesOfOperation = [];
+        }
+        
+        if (typeof parsedData.countriesSourceOfFunds === 'string' && parsedData.countriesSourceOfFunds) {
+          try {
+            parsedData.countriesSourceOfFunds = JSON.parse(parsedData.countriesSourceOfFunds);
+          } catch (e) {
+            parsedData.countriesSourceOfFunds = parsedData.countriesSourceOfFunds ? [parsedData.countriesSourceOfFunds] : [];
+          }
+        } else if (!Array.isArray(parsedData.countriesSourceOfFunds)) {
+          parsedData.countriesSourceOfFunds = [];
+        }
+      }
+      
       // Use the existing data directly
       const shareholderWithDefaults = {
-        ...shareholderToEdit,
+        ...parsedData,
         countryCode: countryCode || '+971',
         phone: phone || '',
         type: shareholderToEdit.type || "Natural Person"
@@ -554,10 +694,11 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
       expectedIncome: "",
       pep: "",
       shareholding: "",
+      dualNationality: "",
       isDirector: false,
       isUbo: false,
       isDualNationality: false,
-      dualNationality: "",
+      dualNationalityCountry: "",
       dualPassportNumber: "",
       dualPassportIssueDate: "",
       dualPassportExpiryDate: ""
@@ -566,69 +707,6 @@ const ShareholdersSection = ({ shareholders = [], onShareholdersChange, isEdit =
     setTouched({});
     setShowAddForm(false);
   };
-  // Add item to multi-select
-const addToMultiSelect = (field, item) => {
-  const currentValues = currentShareholder[field] || [];
-  if (!currentValues.includes(item)) {
-    setCurrentShareholder(prev => ({
-      ...prev,
-      [field]: [...currentValues, item]
-    }));
-  }
-};
-
-// Remove item from multi-select
-const removeFromMultiSelect = (field, item) => {
-  const currentValues = currentShareholder[field] || [];
-  setCurrentShareholder(prev => ({
-    ...prev,
-    [field]: currentValues.filter(value => value !== item)
-  }));
-};
-
-// Render multi-select UI
-const renderMultiSelect = (field, options, placeholder, label) => {
-  const selectedValues = currentShareholder[field] || [];
-  
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <div className="flex flex-wrap gap-2 mb-2">
-        {selectedValues.map((value, index) => (
-          <span
-            key={index}
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-          >
-            {value}
-            <button
-              type="button"
-              onClick={() => removeFromMultiSelect(field, value)}
-              className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-blue-400 hover:text-blue-600 hover:bg-blue-200"
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-      <select
-        className="input"
-        value=""
-        onChange={(e) => {
-          if (e.target.value) {
-            addToMultiSelect(field, e.target.value);
-            e.target.value = "";
-          }
-        }}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
-    </div>
-  );
-};
-
 
   return (
     <div className="border border-gray-200 rounded-lg">
@@ -881,10 +959,10 @@ const renderMultiSelect = (field, options, placeholder, label) => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Dual Nationality</label>
                       <select
-                        className={`input ${errors.dualNationality && touched.dualNationality ? 'border-red-500' : ''}`}
-                        value={currentShareholder.dualNationality}
-                        onChange={(e) => handleInputChange('dualNationality', e.target.value)}
-                        onBlur={() => handleFieldBlur('dualNationality')}
+                        className={`input ${errors.dualNationalityCountry && touched.dualNationalityCountry ? 'border-red-500' : ''}`}
+                        value={currentShareholder.dualNationalityCountry}
+                        onChange={(e) => handleInputChange('dualNationalityCountry', e.target.value)}
+                        onBlur={() => handleFieldBlur('dualNationalityCountry')}
                       >
                         <option value="">Select Dual Nationality</option>
                         {countries.map((country) => (
@@ -893,8 +971,8 @@ const renderMultiSelect = (field, options, placeholder, label) => {
                           </option>
                         ))}
                       </select>
-                      {errors.dualNationality && touched.dualNationality && (
-                        <p className="text-red-500 text-sm mt-1">{errors.dualNationality}</p>
+                      {errors.dualNationalityCountry && touched.dualNationalityCountry && (
+                        <p className="text-red-500 text-sm mt-1">{errors.dualNationalityCountry}</p>
                       )}
                     </div>
                     <div>
@@ -1056,8 +1134,8 @@ const renderMultiSelect = (field, options, placeholder, label) => {
                     onChange={(e) => setCurrentShareholder(prev => ({ ...prev, pep: e.target.value }))}
                   >
                     <option value="">Select PEP Status</option>
-                    {pepOptions.map((item) => (
-                      <option key={item} value={item}>{item}</option>
+                    {yesNoOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
                 </div>
@@ -1199,20 +1277,116 @@ const renderMultiSelect = (field, options, placeholder, label) => {
                   />
                 </div>
                 <div>
-                  {renderMultiSelect(
-                    'businessActivity',
-                    businessActivities, // import from dropdownOptions.js
-                    'Select Business Activity',
-                    'Business Activity'
-                  )}
+                  {(() => {
+                    const selectedValues = currentShareholder.businessActivity || [];
+                    const addToMultiSelect = (item) => {
+                      const currentValues = Array.isArray(currentShareholder.businessActivity) ? currentShareholder.businessActivity : [];
+                      if (!currentValues.includes(item)) {
+                        setCurrentShareholder(prev => ({ ...prev, businessActivity: [...currentValues, item] }));
+                      }
+                    };
+                    const removeFromMultiSelect = (item) => {
+                      const currentValues = Array.isArray(currentShareholder.businessActivity) ? currentShareholder.businessActivity : [];
+                      setCurrentShareholder(prev => ({ ...prev, businessActivity: currentValues.filter(value => value !== item) }));
+                    };
+                    return (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Business Activity <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {selectedValues.map((value, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {value}
+                              <button
+                                type="button"
+                                onClick={() => removeFromMultiSelect(value)}
+                                className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-blue-400 hover:text-blue-600 hover:bg-blue-200"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <select
+                          className="input"
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              addToMultiSelect(e.target.value);
+                              e.target.value = "";
+                            }
+                          }}
+                        >
+                          <option value="">Select Business Activity</option>
+                          {businessActivities.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
-                  {renderMultiSelect(
-                    'countriesOfOperation',
-                    countries.map(c => c.name),
-                    'Select Countries of Operation',
-                    'Countries of Operation'
-                  )}
+                  {(() => {
+                    const selectedValues = currentShareholder.countriesOfOperation || [];
+                    const addToMultiSelect = (item) => {
+                      const currentValues = Array.isArray(currentShareholder.countriesOfOperation) ? currentShareholder.countriesOfOperation : [];
+                      if (!currentValues.includes(item)) {
+                        setCurrentShareholder(prev => ({ ...prev, countriesOfOperation: [...currentValues, item] }));
+                      }
+                    };
+                    const removeFromMultiSelect = (item) => {
+                      const currentValues = Array.isArray(currentShareholder.countriesOfOperation) ? currentShareholder.countriesOfOperation : [];
+                      setCurrentShareholder(prev => ({ ...prev, countriesOfOperation: currentValues.filter(value => value !== item) }));
+                    };
+                    return (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Countries of Operation <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {selectedValues.map((value, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {value}
+                              <button
+                                type="button"
+                                onClick={() => removeFromMultiSelect(value)}
+                                className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-blue-400 hover:text-blue-600 hover:bg-blue-200"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <select
+                          className="input"
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              addToMultiSelect(e.target.value);
+                              e.target.value = "";
+                            }
+                          }}
+                        >
+                          <option value="">Select Countries of Operation</option>
+                          {countries.map((country) => (
+                            <option key={country.code} value={country.name}>
+                              {country.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Source of Funds</label>
@@ -1236,12 +1410,60 @@ const renderMultiSelect = (field, options, placeholder, label) => {
                   />
                 </div>
                 <div>
-                  {renderMultiSelect(
-                    'countriesSourceOfFunds',
-                    countries.map(c => c.name),
-                    'Select Countries Source of Funds',
-                    'Countries Source of Funds'
-                  )}
+                  {(() => {
+                    const selectedValues = currentShareholder.countriesSourceOfFunds || [];
+                    const addToMultiSelect = (item) => {
+                      const currentValues = Array.isArray(currentShareholder.countriesSourceOfFunds) ? currentShareholder.countriesSourceOfFunds : [];
+                      if (!currentValues.includes(item)) {
+                        setCurrentShareholder(prev => ({ ...prev, countriesSourceOfFunds: [...currentValues, item] }));
+                      }
+                    };
+                    const removeFromMultiSelect = (item) => {
+                      const currentValues = Array.isArray(currentShareholder.countriesSourceOfFunds) ? currentShareholder.countriesSourceOfFunds : [];
+                      setCurrentShareholder(prev => ({ ...prev, countriesSourceOfFunds: currentValues.filter(value => value !== item) }));
+                    };
+                    return (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Countries Source of Funds <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {selectedValues.map((value, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {value}
+                              <button
+                                type="button"
+                                onClick={() => removeFromMultiSelect(value)}
+                                className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-blue-400 hover:text-blue-600 hover:bg-blue-200"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <select
+                          className="input"
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              addToMultiSelect(e.target.value);
+                              e.target.value = "";
+                            }
+                          }}
+                        >
+                          <option value="">Select Countries Source of Funds</option>
+                          {countries.map((country) => (
+                            <option key={country.code} value={country.name}>
+                              {country.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -1468,3 +1690,5 @@ const renderMultiSelect = (field, options, placeholder, label) => {
 };
 
 export default ShareholdersSection;
+
+

@@ -310,7 +310,14 @@ const LegalEntityForm = ({ formData, onInputChange }) => {
           onChange={(e) => onInputChange('addressExpiryDate', e.target.value)}
         />
       </div>
+      
+
+      
+
     </div>
   );
 };
+
 export default LegalEntityForm;
+
+
