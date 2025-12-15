@@ -12,7 +12,10 @@ const RiskRules = () => {
   const [ruleType, setRuleType] = useState("ONBOARDING"); // 'ONBOARDING' | 'TRANSACTION_PROFILE' | 'TRANSACTION_EVENT'
   const [showFilters, setShowFilters] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [editingRule, setEditingRule] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
   const [filters, setFilters] = useState({
@@ -23,6 +26,12 @@ const RiskRules = () => {
     status: "",
   });
   const [newRule, setNewRule] = useState({
+    categoryId: "",
+    ruleName: "",
+    riskScore: "",
+    isActive: true,
+  });
+  const [editRule, setEditRule] = useState({
     categoryId: "",
     ruleName: "",
     riskScore: "",
@@ -506,105 +515,342 @@ const RiskRules = () => {
           </div>
       </div>
 
-      {/* Add New Rule Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg p-6 max-w-xl w-full mx-4 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Add New Rule</h2>
+      {/* Edit Rule Modal */}
+      {showEditModal && editingRule && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEditModal(false);
+              setEditingRule(null);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-auto my-8 max-h-[90vh] overflow-hidden flex flex-col transform transition-all duration-200 ease-out">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Edit Risk Rule</h2>
+              </div>
               <button
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition duration-200"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingRule(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-white transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={newRule.categoryId}
-                  onChange={(e) =>
-                    setNewRule((prev) => ({ ...prev, categoryId: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select category</option>
-                  {uniqueCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rule Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newRule.ruleName}
-                  onChange={(e) =>
-                    setNewRule((prev) => ({ ...prev, ruleName: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter rule name..."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Risk Score <span className="text-red-500">*</span>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Category <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={newRule.riskScore}
+                    value={editRule.categoryId}
                     onChange={(e) =>
-                      setNewRule((prev) => ({ ...prev, riskScore: e.target.value }))
+                      setEditRule((prev) => ({ ...prev, categoryId: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 bg-white hover:border-gray-400"
                   >
-                    <option value="">Select score</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
+                    <option value="">Select category</option>
+                    {uniqueCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="flex items-center">
-                <input
-                  id="newRuleActive"
-                  type="checkbox"
-                  checked={newRule.isActive}
-                  onChange={(e) =>
-                    setNewRule((prev) => ({ ...prev, isActive: e.target.checked }))
-                  }
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <label
-                  htmlFor="newRuleActive"
-                  className="ml-2 block text-sm text-gray-700"
-                >
-                  Active
-                </label>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Rule Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editRule.ruleName}
+                    onChange={(e) =>
+                      setEditRule((prev) => ({ ...prev, ruleName: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 placeholder-gray-400 hover:border-gray-400"
+                    placeholder="Enter rule name..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Risk Score <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={editRule.riskScore}
+                      onChange={(e) =>
+                        setEditRule((prev) => ({ ...prev, riskScore: e.target.value }))
+                      }
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 bg-white hover:border-gray-400"
+                    >
+                      <option value="">Select score</option>
+                      <option value="1">1 - Low Risk</option>
+                      <option value="2">2 - Medium Low Risk</option>
+                      <option value="3">3 - Medium Risk</option>
+                      <option value="4">4 - Medium High Risk</option>
+                      <option value="5">5 - High Risk</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Status
+                    </label>
+                    <div className="mt-2 flex items-center p-3 border border-gray-300 rounded-lg hover:border-gray-400 transition duration-200">
+                      <input
+                        id="editRuleActive"
+                        type="checkbox"
+                        checked={editRule.isActive}
+                        onChange={(e) =>
+                          setEditRule((prev) => ({ ...prev, isActive: e.target.checked }))
+                        }
+                        className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <label
+                        htmlFor="editRuleActive"
+                        className="ml-3 block text-sm font-medium text-gray-700 cursor-pointer"
+                      >
+                        {editRule.isActive ? (
+                          <span className="text-green-600">Active</span>
+                        ) : (
+                          <span className="text-gray-500">Inactive</span>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingRule(null);
+                }}
+                disabled={updating}
+                className="inline-flex items-center px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  updating ||
+                  !editRule.categoryId ||
+                  !editRule.ruleName.trim() ||
+                  editRule.riskScore === ""
+                }
+                onClick={async () => {
+                  try {
+                    setUpdating(true);
+                    const scoreNumber = Number(editRule.riskScore);
+                    const logicMap = {
+                      1: "LOW",
+                      2: "MEDIUM LOW",
+                      3: "MEDIUM",
+                      4: "MEDIUM HIGH",
+                      5: "HIGH",
+                    };
+                    const derivedLogic = logicMap[scoreNumber] || "LOW";
+
+                    const payload = {
+                      categoryId: editRule.categoryId,
+                      ruleText: editRule.ruleName.trim(),
+                      riskLogic: derivedLogic,
+                      riskScore: scoreNumber,
+                      isActive: editRule.isActive,
+                    };
+
+                    const result = await riskService.updateRiskRule(editingRule.id, payload);
+
+                    if (result.success) {
+                      // Reload rules list
+                      const refreshed = await riskService.getRiskRules();
+                      if (refreshed.success) {
+                        setRules(refreshed.rules || []);
+                      }
+                      setShowEditModal(false);
+                      setEditingRule(null);
+                    } else {
+                      console.error(result.error || "Failed to update rule");
+                      alert(result.error || "Failed to update rule");
+                    }
+                  } catch (err) {
+                    console.error("Error updating rule:", err);
+                    alert("An error occurred while updating the rule");
+                  } finally {
+                    setUpdating(false);
+                  }
+                }}
+                className="inline-flex items-center px-5 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                {updating ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Update Rule
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Rule Modal */}
+      {showAddModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-auto my-8 max-h-[90vh] overflow-hidden flex flex-col transform transition-all duration-200 ease-out">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Add New Risk Rule</h2>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-white transition duration-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Category <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newRule.categoryId}
+                    onChange={(e) =>
+                      setNewRule((prev) => ({ ...prev, categoryId: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 bg-white hover:border-gray-400"
+                  >
+                    <option value="">Select category</option>
+                    {uniqueCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Rule Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newRule.ruleName}
+                    onChange={(e) =>
+                      setNewRule((prev) => ({ ...prev, ruleName: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 placeholder-gray-400 hover:border-gray-400"
+                    placeholder="Enter rule name..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Risk Score <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newRule.riskScore}
+                      onChange={(e) =>
+                        setNewRule((prev) => ({ ...prev, riskScore: e.target.value }))
+                      }
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 bg-white hover:border-gray-400"
+                    >
+                      <option value="">Select score</option>
+                      <option value="1">1 - Low Risk</option>
+                      <option value="2">2 - Medium Low Risk</option>
+                      <option value="3">3 - Medium Risk</option>
+                      <option value="4">4 - Medium High Risk</option>
+                      <option value="5">5 - High Risk</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Status
+                    </label>
+                    <div className="mt-2 flex items-center p-3 border border-gray-300 rounded-lg hover:border-gray-400 transition duration-200">
+                      <input
+                        id="newRuleActive"
+                        type="checkbox"
+                        checked={newRule.isActive}
+                        onChange={(e) =>
+                          setNewRule((prev) => ({ ...prev, isActive: e.target.checked }))
+                        }
+                        className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <label
+                        htmlFor="newRuleActive"
+                        className="ml-3 block text-sm font-medium text-gray-700 cursor-pointer"
+                      >
+                        {newRule.isActive ? (
+                          <span className="text-green-600">Active</span>
+                        ) : (
+                          <span className="text-gray-500">Inactive</span>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
                 disabled={adding}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm font-medium transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
@@ -655,9 +901,24 @@ const RiskRules = () => {
                     setAdding(false);
                   }
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center px-5 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
-                {adding ? "Saving..." : "Add New Rule"}
+                {adding ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Add New Rule
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -724,32 +985,54 @@ const RiskRules = () => {
               )}
 
               {!loading && !error && paginatedRules.map((rule) => (
-                <tr key={rule.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {rule.ruleText}
+                <tr 
+                  key={rule.id} 
+                  className="hover:bg-blue-50 cursor-pointer transition-all duration-150 group border-b border-gray-100"
+                  onClick={() => {
+                    setEditingRule(rule);
+                    setEditRule({
+                      categoryId: rule.categoryId,
+                      ruleName: rule.ruleText,
+                      riskScore: rule.riskScore.toString(),
+                      isActive: rule.isActive,
+                    });
+                    setShowEditModal(true);
+                  }}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
+                    <div className="flex items-center gap-2">
+                      {rule.ruleText}
+                      <svg className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                       {rule.categoryName}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      rule.riskScore >= 60 ? 'bg-red-100 text-red-800' :
-                      rule.riskScore >= 40 ? 'bg-orange-100 text-orange-800' :
-                      rule.riskScore >= 20 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                      rule.riskScore >= 4 ? 'bg-red-100 text-red-800 border-red-200' :
+                      rule.riskScore >= 3 ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                      rule.riskScore >= 2 ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                      'bg-green-100 text-green-800 border-green-200'
                     }`}>
                       {rule.riskScore}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
                       {rule.riskLogic || "-"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                      rule.isActive 
+                        ? 'bg-green-100 text-green-800 border-green-200' 
+                        : 'bg-gray-100 text-gray-600 border-gray-200'
+                    }`}>
                       {rule.isActive ? "Active" : "Inactive"}
                   </span>
                 </td>

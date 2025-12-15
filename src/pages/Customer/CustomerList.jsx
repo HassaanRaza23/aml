@@ -317,6 +317,18 @@ const CustomerList = () => {
     setExpandedRows(new Set());
   }, [navigate]);
 
+    // Handle risk mitigation
+  const handleRiskMitigation = useCallback((customerId) => {
+    navigate(`/customer/risk-mitigation/${customerId}`);
+    setExpandedRows(new Set());
+  }, [navigate]);
+
+  // Handle document upload
+  const handleDocumentUpload = useCallback((customerId) => {
+    navigate(`/customer/documents/${customerId}`);
+    setExpandedRows(new Set());
+  }, [navigate]);
+
   // Handle customer update
   const handleUpdateCustomer = useCallback(async (updatedData) => {
     try {
@@ -642,6 +654,24 @@ const CustomerList = () => {
                           className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
                         >
                           Risk Profile
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRiskMitigation(cust.id);
+                          }}
+                          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
+                        >
+                          Risk Mitigation
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDocumentUpload(cust.id);
+                          }}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
+                        >
+                          Document Upload
                         </button>
                   <button
                           onClick={(e) => {

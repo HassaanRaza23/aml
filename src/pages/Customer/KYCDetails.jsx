@@ -893,36 +893,36 @@ const KYCDetails = () => {
           return (
             <div key={key} className="col-span-2 mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-              <div className="flex items-center space-x-6 mb-2">
+            <div className="flex items-center space-x-6 mb-2">
                 <label className="flex items-center space-x-2">
-                  <input
+                <input
                     type="radio"
                     name={key}
                     value="yes"
                     checked={verificationChecks[key]?.answer === "yes"}
                     onChange={() =>
-                      setVerificationChecks((prev) => ({
+                    setVerificationChecks((prev) => ({
                         ...prev,
                         [key]: { answer: "yes", notes: prev[key]?.notes || "" },
-                      }))
+                    }))
                     }
-                  />
-                  <span>Yes</span>
+                />
+                <span>Yes</span>
                 </label>
                 <label className="flex items-center space-x-2">
-                  <input
+                <input
                     type="radio"
                     name={key}
                     value="no"
                     checked={verificationChecks[key]?.answer === "no"}
                     onChange={() =>
-                      setVerificationChecks((prev) => ({
+                    setVerificationChecks((prev) => ({
                         ...prev,
                         [key]: { answer: "no", notes: "" },
-                      }))
+                    }))
                     }
-                  />
-                  <span>No</span>
+                />
+                <span>No</span>
                 </label>
                 <label className="flex items-center space-x-2">
                   <input
@@ -939,7 +939,7 @@ const KYCDetails = () => {
                   />
                   <span>N/A</span>
                 </label>
-              </div>
+            </div>
             {verificationChecks[key]?.answer === "yes" && (
                 <textarea
                 className="w-full border border-gray-300 rounded-md p-2"
@@ -975,7 +975,7 @@ const KYCDetails = () => {
           <textarea
             className={`w-full border rounded-md p-2 ${remarksError ? 'border-red-500' : 'border-gray-300'}`}
             rows={3}
-            value={remarks}
+          value={remarks}
             onChange={(e) => {
               setRemarks(e.target.value);
               if (remarksError && e.target.value.trim()) {

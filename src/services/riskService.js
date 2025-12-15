@@ -211,6 +211,39 @@ export const riskService = {
     }
   },
 
+  // Update an existing risk rule
+  updateRiskRule: async (ruleId, ruleData) => {
+    try {
+      const payload = {
+        category_id: ruleData.categoryId,
+        rule_text: ruleData.ruleText,
+        risk_score: ruleData.riskScore,
+        risk_logic: ruleData.riskLogic,
+        is_active: ruleData.isActive ?? true,
+      }
+
+      const { data, error } = await supabase
+        .from('risk_rules')
+        .update(payload)
+        .eq('id', ruleId)
+        .select('*')
+        .single()
+
+      if (error) throw error
+
+      return {
+        success: true,
+        rule: data,
+      }
+    } catch (error) {
+      console.error('Error updating risk rule:', error)
+      return {
+        success: false,
+        error: error.message || 'Failed to update risk rule',
+      }
+    }
+  },
+
   // Get risk statistics
   getRiskStats: async () => {
     try {

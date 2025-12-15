@@ -15,6 +15,7 @@ const RiskProfile = () => {
   const [calculatedScore, setCalculatedScore] = useState(0);
   const [triggeredRules, setTriggeredRules] = useState([]);
   const [calculationBreakdown, setCalculationBreakdown] = useState(null);
+  const [latestMitigation, setLatestMitigation] = useState(null);
 
   // Manual override state
   const [overrideLevel, setOverrideLevel] = useState("");
@@ -126,9 +127,30 @@ const RiskProfile = () => {
               return shareholder
             })
           }
+
+          // Prefer stored risk assessment snapshot; fall back to live calculation if none
+          let riskCalculation;
+          const assessmentResult = await customerService.getLatestRiskAssessment(customerId);
           
-          // Calculate risk score and factors
-          const riskCalculation = await calculateRiskScore(flattenedData);
+          if (assessmentResult && assessmentResult.success && assessmentResult.data) {
+            const assessment = assessmentResult.data;
+            const snapshotRules = (assessment.triggered_rules || []).map(rule => ({
+              id: rule.id,
+              name: rule.name,
+              score: rule.score,
+              category: rule.category,
+              fieldName: rule.fieldName || rule.field_name || null,
+            }));
+            
+            riskCalculation = {
+              score: Number(assessment.risk_score ?? 0),
+              level: assessment.risk_level || "Low",
+              triggeredRules: snapshotRules,
+            };
+          } else {
+            riskCalculation = await calculateRiskScore(flattenedData);
+          }
+          
           const rules = riskCalculation.triggeredRules || [];
           
           setCalculatedScore(riskCalculation.score);
@@ -155,9 +177,19 @@ const RiskProfile = () => {
             averageScore,
             rulesByCategory
           });
+
+          // Load latest mitigation snapshot so we can show residual risk, if any
+          const mitigationResult = await customerService.getLatestRiskMitigation(customerId);
+          if (mitigationResult && mitigationResult.success && mitigationResult.data) {
+            setLatestMitigation(mitigationResult.data);
+          } else {
+            setLatestMitigation(null);
+          }
           
           // Define field mappings (same as in riskCalculation.js)
           const NATURAL_PERSON_FIELD_MAPPING = {
+            fullNameSanctionMatch: 'Full Name Sanction',
+            customerType: 'CUSTOMER TYPE',
             profession: 'BUSINESS ACTIVITY',
             nationality: 'Nationality',
             residencyStatus: 'RESIDENCY STATUS',
@@ -170,6 +202,8 @@ const RiskProfile = () => {
           };
           
           const LEGAL_ENTITY_FIELD_MAPPING = {
+            fullNameSanctionMatch: 'Full Name Sanction',
+            customerType: 'CUSTOMER TYPE',
             businessActivity: 'BUSINESS ACTIVITY',
             countryOfIncorporation: 'Country Of Incorporation',
             licenseType: 'LICENSE TYPE',
@@ -182,6 +216,7 @@ const RiskProfile = () => {
           };
           
           const SHAREHOLDER_NATURAL_PERSON_FIELD_MAPPING = {
+            fullNameSanctionMatch: 'Full Name Sanction',
             countryOfResidence: 'Country Of Residence',
             nationality: 'Nationality',
             placeOfBirth: 'Country Of Birth',
@@ -193,6 +228,7 @@ const RiskProfile = () => {
           };
           
           const SHAREHOLDER_LEGAL_ENTITY_FIELD_MAPPING = {
+            fullNameSanctionMatch: 'Full Name Sanction',
             businessActivity: 'BUSINESS ACTIVITY',
             countryOfIncorporation: 'Country Of Incorporation',
             licenseType: 'LICENSE TYPE',
@@ -236,7 +272,8 @@ const RiskProfile = () => {
             // Always check isDualNationality, other fields only if they have a value
             const shouldInclude = (fieldValue !== undefined && fieldValue !== null && fieldValue !== '' && 
               !(Array.isArray(fieldValue) && fieldValue.length === 0)) 
-              || fieldName === 'isDualNationality';
+              || fieldName === 'isDualNationality'
+              || fieldName === 'fullNameSanctionMatch';
             
             if (shouldInclude) {
               const fieldNameDisplay = formatFieldName(fieldName);
@@ -304,7 +341,7 @@ const RiskProfile = () => {
                   });
                   uniqueRules.forEach(rule => {
                     factors.push({
-                      fieldName: 'Type',
+                      fieldName: 'Shareholder Type',
                       ruleName: rule.name.trim(),
                       riskScore: rule.score,
                       riskLevel: getRiskLevel(rule.score),
@@ -331,7 +368,8 @@ const RiskProfile = () => {
                 // Always check isDualNationality, other fields only if they have a value
                 const shouldInclude = (fieldValue !== undefined && fieldValue !== null && fieldValue !== '' &&
                   !(Array.isArray(fieldValue) && fieldValue.length === 0))
-                  || fieldName === 'isDualNationality';
+                  || fieldName === 'isDualNationality'
+                  || fieldName === 'fullNameSanctionMatch';
                 
                 // Skip dualNationality if isDualNationality is not Yes
                 if (fieldName === 'dualNationality') {
@@ -521,6 +559,7 @@ const RiskProfile = () => {
         <table className="w-full border text-sm">
           <thead className="bg-gray-100 text-left">
             <tr>
+              <th className="p-2 border w-10 text-center">#</th>
               <th className="p-2 border">Field Name</th>
               <th className="p-2 border">Rule Name</th>
               <th className="p-2 border">Risk Score</th>
@@ -533,6 +572,9 @@ const RiskProfile = () => {
               if (item.isHeading) {
                 return (
                   <tr key={index} className="bg-gray-100">
+                    <td className="p-3 border text-center font-semibold text-gray-500">
+                      {index + 1}
+                    </td>
                     <td colSpan="4" className="p-3 border font-semibold text-gray-800">
                       {item.fieldName}
                     </td>
@@ -543,7 +585,8 @@ const RiskProfile = () => {
               // Regular data row
               return (
               <tr key={index}>
-                  <td className="p-2 border pl-6">{item.fieldName}</td>
+                  <td className="p-2 border text-center text-gray-500">{index + 1}</td>
+                  <td className="p-2 border pl-4">{item.fieldName}</td>
                   <td className={`p-2 border ${item.ruleName === 'No match' ? 'text-gray-400 italic' : ''}`}>
                     {item.ruleName}
                   </td>
@@ -608,7 +651,23 @@ const RiskProfile = () => {
               <p><strong>Total Score:</strong> Sum of all triggered rule scores = {calculationBreakdown.totalScore.toFixed(2)}</p>
               <p><strong>Rule Count:</strong> Number of triggered rules = {calculationBreakdown.ruleCount}</p>
               <p className="font-semibold text-gray-800">
-                <strong>Average Score:</strong> Total Score ÷ Rule Count = {calculationBreakdown.averageScore.toFixed(2)}
+                <strong>Onboarding Risk Score:</strong> Total Score ÷ Rule Count = {calculationBreakdown.averageScore.toFixed(2)}
+              </p>
+              <p>
+                <strong>Mitigation Score:</strong>{" "}
+                {latestMitigation ? Number(latestMitigation.mitigation_score ?? 0).toFixed(2) : "0.00"}{" "}
+              </p>
+              <p className="font-semibold text-gray-800">
+                <strong>Residual Risk Score:</strong>{" "}
+                {latestMitigation && "Onboarding Risk * Mitigation Score = "}
+                {latestMitigation
+                  ? Number(latestMitigation.residual_risk_score ?? 0).toFixed(3)
+                  : calculationBreakdown.averageScore.toFixed(3)}{" "}
+                
+              </p>
+              <p>
+                <strong>Residual Risk Rating:</strong>{" "}
+                {latestMitigation?.residual_risk_level || calculatedRiskLevel}
               </p>
             </div>
           </div>

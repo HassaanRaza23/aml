@@ -16,6 +16,8 @@ import CustomerList from './pages/Customer/CustomerList';
 import CustomerForm from './pages/Customer/OnboardingForm';
 import KYCDetails from './pages/Customer/KYCDetails';
 import RiskProfile from './pages/Customer/RiskProfile';
+import RiskMitigation from './pages/Customer/RiskMitigation';
+import DocumentUpload from './pages/Customer/DocumentUpload';
 
 // Screening
 import InstantScreening from './pages/Screening/InstantScreening';
@@ -79,6 +81,8 @@ const App = () => {
                 <Route path="customer/onboarding" element={<CustomerForm />} />
                 <Route path="customer/kyc/:customerId" element={<KYCDetails />} />
                 <Route path="customer/risk-profile/:customerId" element={<RiskProfile />} />
+                <Route path="customer/risk-mitigation/:customerId" element={<RiskMitigation />} />
+                <Route path="customer/documents/:customerId" element={<DocumentUpload />} />
 
                 {/* Screening */}
                 <Route path="screening/instant" element={<InstantScreening />} />

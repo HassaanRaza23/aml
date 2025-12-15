@@ -7,8 +7,22 @@ countries.forEach(country => {
   countryCodeToName.set(country.code.toUpperCase(), country.name.toUpperCase())
 })
 
+// Helper: map full name sanction match count (0–5) to label used by rules
+// 5 of 5 fields match  -> "Full name match"
+// 3–4 of 5 fields      -> "Partial name match"
+// 0–2 of 5 fields      -> "No name match"
+const getFullNameSanctionLabel = (matchCount) => {
+  const count = Number(matchCount) || 0
+  if (count >= 5) return 'Full name match'
+  if (count >= 3) return 'Partial name match'
+  return 'No name match'
+}
+
 // Field mappings: Customer field -> Risk Category name
 const NATURAL_PERSON_FIELD_MAPPING = {
+  // Main customer type + sanction screening
+  customerType: 'CUSTOMER TYPE',
+  fullNameSanctionMatch: 'Full Name Sanction',
   profession: 'BUSINESS ACTIVITY',
   nationality: 'Nationality',
   residencyStatus: 'RESIDENCY STATUS',
@@ -22,6 +36,9 @@ const NATURAL_PERSON_FIELD_MAPPING = {
 }
 
 const LEGAL_ENTITY_FIELD_MAPPING = {
+  // Main customer type + sanction screening
+  customerType: 'CUSTOMER TYPE',
+  fullNameSanctionMatch: 'Full Name Sanction',
   businessActivity: 'BUSINESS ACTIVITY',
   countryOfIncorporation: 'Country Of Incorporation',
   licenseType: 'LICENSE TYPE',
@@ -34,6 +51,8 @@ const LEGAL_ENTITY_FIELD_MAPPING = {
 }
 
 const SHAREHOLDER_NATURAL_PERSON_FIELD_MAPPING = {
+  // Shareholder-level sanction screening
+  fullNameSanctionMatch: 'Full Name Sanction',
   countryOfResidence: 'Country Of Residence',
   nationality: 'Nationality',
   placeOfBirth: 'Country Of Birth',
@@ -45,6 +64,8 @@ const SHAREHOLDER_NATURAL_PERSON_FIELD_MAPPING = {
 }
 
 const SHAREHOLDER_LEGAL_ENTITY_FIELD_MAPPING = {
+  // Shareholder-level sanction screening
+  fullNameSanctionMatch: 'Full Name Sanction',
   businessActivity: 'BUSINESS ACTIVITY',
   countryOfIncorporation: 'Country Of Incorporation',
   licenseType: 'LICENSE TYPE',
@@ -59,10 +80,11 @@ const getRelevantCategories = (customerType, includeShareholderCategories = fals
   
   if (customerType === 'Natural Person') {
     Object.values(NATURAL_PERSON_FIELD_MAPPING).forEach(cat => categories.add(cat))
+    // Always include CUSTOMER TYPE so we can apply rules based on main customer type
+    categories.add('CUSTOMER TYPE')
     if (includeShareholderCategories) {
       Object.values(SHAREHOLDER_NATURAL_PERSON_FIELD_MAPPING).forEach(cat => categories.add(cat))
       Object.values(SHAREHOLDER_LEGAL_ENTITY_FIELD_MAPPING).forEach(cat => categories.add(cat))
-      categories.add('CUSTOMER TYPE')
     }
   } else if (customerType === 'Legal Entities') {
     Object.values(LEGAL_ENTITY_FIELD_MAPPING).forEach(cat => categories.add(cat))
@@ -382,9 +404,29 @@ const calculateNaturalPersonRisk = async (customerData) => {
   const triggeredRules = []
   const triggeredRuleIds = new Set()
   let totalScore = 0
+
+  // First, apply Full Name Sanction rule for the main customer (if screening result is available)
+  // Expectation: another service may set customerData.fullNameSanctionMatchCount (0–5).
+  // If it's missing, default to 0 so "No name match" still triggers.
+  {
+    const rawCount = getFieldValue(customerData, 'fullNameSanctionMatchCount')
+    const mainSanctionMatchCount = rawCount !== undefined && rawCount !== null ? rawCount : 0
+    const sanctionLabel = getFullNameSanctionLabel(mainSanctionMatchCount)
+    totalScore = checkFieldAgainstRules(
+      sanctionLabel,
+      'Full Name Sanction',
+      ruleIndex,
+      triggeredRuleIds,
+      triggeredRules,
+      totalScore,
+      'fullNameSanctionMatch'
+    )
+  }
   
   // Check each field in the mapping
   for (const [fieldName, categoryName] of Object.entries(NATURAL_PERSON_FIELD_MAPPING)) {
+    // fullNameSanctionMatch is handled explicitly above using the match-count helper
+    if (fieldName === 'fullNameSanctionMatch') continue
     const fieldValue = getFieldValue(customerData, fieldName)
     
     // Always check isDualNationality, other fields only if they have a value
@@ -431,9 +473,29 @@ const calculateLegalEntityRisk = async (customerData) => {
   const triggeredRules = []
   const triggeredRuleIds = new Set()
   let totalScore = 0
+
+  // Step 0: Apply Full Name Sanction rule for the main legal entity (if screening result is available)
+  // Expectation: another service may set customerData.fullNameSanctionMatchCount (0–5).
+  // If it's missing, default to 0 so "No name match" still triggers.
+  {
+    const rawCount = getFieldValue(customerData, 'fullNameSanctionMatchCount')
+    const mainSanctionMatchCount = rawCount !== undefined && rawCount !== null ? rawCount : 0
+    const sanctionLabel = getFullNameSanctionLabel(mainSanctionMatchCount)
+    totalScore = checkFieldAgainstRules(
+      sanctionLabel,
+      'Full Name Sanction',
+      ruleIndex,
+      triggeredRuleIds,
+      triggeredRules,
+      totalScore,
+      'fullNameSanctionMatch'
+    )
+  }
   
   // Step 1: Check customer-level fields
   for (const [fieldName, categoryName] of Object.entries(LEGAL_ENTITY_FIELD_MAPPING)) {
+    // fullNameSanctionMatch is handled explicitly above using the match-count helper
+    if (fieldName === 'fullNameSanctionMatch') continue
     const fieldValue = getFieldValue(customerData, fieldName)
     
     if (fieldValue && (Array.isArray(fieldValue) ? fieldValue.length > 0 : true)) {
@@ -454,6 +516,24 @@ const calculateLegalEntityRisk = async (customerData) => {
     customerData.shareholders.forEach((shareholder, shareholderIndex) => {
       const shareholderType = shareholder.shareholderType || shareholder.type || shareholder.entity_type
       
+      // 2.a Apply Full Name Sanction rule for each shareholder (if screening result is available)
+      // Expectation: another service may set shareholder.fullNameSanctionMatchCount (0–5).
+      // If it's missing, default to 0 so "No name match" still triggers.
+      {
+        const rawCount = getFieldValue(shareholder, 'fullNameSanctionMatchCount')
+        const shSanctionMatchCount = rawCount !== undefined && rawCount !== null ? rawCount : 0
+        const sanctionLabel = getFullNameSanctionLabel(shSanctionMatchCount)
+        totalScore = checkFieldAgainstRules(
+          sanctionLabel,
+          'Full Name Sanction',
+          ruleIndex,
+          triggeredRuleIds,
+          triggeredRules,
+          totalScore,
+          `shareholder.${shareholderIndex}.fullNameSanctionMatch`
+        )
+      }
+
       // Check shareholder type
       const customerTypeCategory = 'CUSTOMER TYPE'
       const customerTypeRules = ruleIndex.get(customerTypeCategory)

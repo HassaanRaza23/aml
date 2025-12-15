@@ -95,6 +95,336 @@ export const customerService = {
     }
   },
 
+  // Get latest stored risk assessment (snapshot) for a customer
+  getLatestRiskAssessment: async (customerId) => {
+    try {
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        // In mock mode, we don't have assessments table; just return empty
+        return { success: false, data: null, error: 'Supabase not configured' }
+      }
+
+      const { data, error } = await supabase
+        .from('risk_assessments')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('assessment_date', { ascending: false })
+        .limit(1)
+
+      if (error) {
+        console.error('Error fetching latest risk assessment:', error)
+        return { success: false, data: null, error: error.message || 'Failed to fetch assessment' }
+      }
+
+      const assessment = data && data.length > 0 ? data[0] : null
+
+      return {
+        success: !!assessment,
+        data: assessment,
+        error: assessment ? null : 'No risk assessment found',
+      }
+    } catch (error) {
+      console.error('Unexpected error in getLatestRiskAssessment:', error)
+      return {
+        success: false,
+        data: null,
+        error: error.message || 'Failed to fetch assessment',
+      }
+    }
+  },
+
+  // Save risk mitigation controls and update customer residual risk
+  saveRiskMitigation: async (customerId, mitigationData) => {
+    try {
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        console.log('🔧 Mock saveRiskMitigation (Supabase not configured)', {
+          customerId,
+          mitigationData,
+        })
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return { success: true, data: mitigationData, message: 'Mitigation saved (Mock Mode)' }
+      }
+
+      const now = new Date().toISOString()
+
+      // Persist mitigation snapshot
+      const payload = {
+        customer_id: customerId,
+        mitigation_answers: mitigationData.answers || {},
+        per_control_scores: mitigationData.perControl || {},
+        mitigation_score: mitigationData.mitigationScore ?? 0,
+        residual_risk_score: mitigationData.residualRiskScore ?? 0,
+        residual_risk_level: mitigationData.residualRiskLevel || null,
+        created_at: now,
+      }
+
+      const { error: insertError } = await supabase
+        .from('risk_mitigations')
+        .insert(payload)
+
+      if (insertError) {
+        console.error('❌ Failed to save risk mitigation:', insertError)
+        return {
+          success: false,
+          error: insertError.message || 'Failed to save risk mitigation',
+        }
+      }
+
+      // Update customer with new residual risk as current risk profile
+      const roundedResidual = Math.round((mitigationData.residualRiskScore ?? 0) * 100) / 100
+      const updateData = {
+        risk_score: roundedResidual,
+        risk_level: mitigationData.residualRiskLevel || null,
+        updated_at: now,
+      }
+
+      const { error: updateError } = await supabase
+        .from('customers')
+        .update(updateData)
+        .eq('id', customerId)
+
+      if (updateError) {
+        console.error('⚠️ Failed to update customer residual risk:', updateError)
+        return {
+          success: false,
+          error: updateError.message || 'Failed to update customer residual risk',
+        }
+      }
+
+      return {
+        success: true,
+        data: { ...payload, ...updateData },
+        message: 'Risk mitigation and residual risk saved successfully',
+      }
+    } catch (error) {
+      console.error('Unexpected error in saveRiskMitigation:', error)
+      return {
+        success: false,
+        error: error.message || 'Failed to save risk mitigation',
+      }
+    }
+  },
+
+  // Get latest risk mitigation snapshot
+  getLatestRiskMitigation: async (customerId) => {
+    try {
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        return { success: false, data: null, error: 'Supabase not configured' }
+      }
+
+      const { data, error } = await supabase
+        .from('risk_mitigations')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (error) {
+        console.error('Error fetching latest risk mitigation:', error)
+        return { success: false, data: null, error: error.message || 'Failed to fetch mitigation' }
+      }
+
+      const mitigation = data && data.length > 0 ? data[0] : null
+
+      return {
+        success: !!mitigation,
+        data: mitigation,
+        error: mitigation ? null : 'No mitigation found',
+      }
+    } catch (error) {
+      console.error('Unexpected error in getLatestRiskMitigation:', error)
+      return {
+        success: false,
+        data: null,
+        error: error.message || 'Failed to fetch mitigation',
+      }
+    }
+  },
+
+  // Upload a customer document to Supabase storage and save metadata
+  uploadCustomerDocument: async (customerId, file, { category, description } = {}) => {
+    try {
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        console.log('🔧 Mock uploadCustomerDocument (Supabase not configured)', {
+          customerId,
+          fileName: file?.name,
+          category,
+        })
+        await new Promise(resolve => setTimeout(resolve, 300))
+        return {
+          success: true,
+          data: {
+            id: 'mock-doc-id',
+            customer_id: customerId,
+            file_name: file?.name || 'mock-file',
+            category,
+            description,
+            created_at: new Date().toISOString(),
+          },
+          message: 'Document upload simulated (Mock Mode)',
+        }
+      }
+
+      if (!file) {
+        return { success: false, error: 'No file selected' }
+      }
+
+      const user = await getCurrentUser().catch(() => null)
+      const bucket = 'customer_documents'
+      const timestamp = Date.now()
+      const safeName = file.name.replace(/\s+/g, '_')
+      const objectPath = `customer-${customerId}/${timestamp}-${safeName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(objectPath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type || undefined,
+        })
+
+      if (uploadError) {
+        console.error('❌ Error uploading document to storage:', uploadError)
+        return { success: false, error: uploadError.message || 'Failed to upload document' }
+      }
+
+      const metadata = {
+        customer_id: customerId,
+        bucket,
+        object_path: objectPath,
+        file_name: file.name,
+        file_type: file.type || null,
+        file_size_bytes: file.size || null,
+        category: category || null,
+        description: description || null,
+        uploaded_by: user?.id || null,
+      }
+
+      const { data, error: insertError } = await supabase
+        .from('customer_documents')
+        .insert(metadata)
+        .select('*')
+        .single()
+
+      if (insertError) {
+        console.error('❌ Error inserting document metadata:', insertError)
+        return { success: false, error: insertError.message || 'Failed to save document metadata' }
+      }
+
+      return { success: true, data, message: 'Document uploaded successfully' }
+    } catch (error) {
+      console.error('Unexpected error in uploadCustomerDocument:', error)
+      return {
+        success: false,
+        error: error.message || 'Failed to upload document',
+      }
+    }
+  },
+
+  // Get all documents for a customer (with public URLs)
+  getCustomerDocuments: async (customerId) => {
+    try {
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        console.log('🔧 Mock getCustomerDocuments (Supabase not configured)', { customerId })
+        return { success: true, data: [], message: 'Using mock documents (none)' }
+      }
+
+      const { data, error } = await supabase
+        .from('customer_documents')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('❌ Error fetching customer documents:', error)
+        return { success: false, data: [], error: error.message || 'Failed to fetch documents' }
+      }
+
+      const withUrls = await Promise.all(
+        data.map(async (doc) => {
+          // For private buckets, we need to create signed URLs
+          // Signed URLs expire after 1 hour (3600 seconds)
+          const { data: urlData, error: urlError } = await supabase.storage
+            .from(doc.bucket)
+            .createSignedUrl(doc.object_path, 3600) // 1 hour expiry
+
+          if (urlError) {
+            console.error('Error creating signed URL for', doc.object_path, urlError)
+            return {
+              ...doc,
+              publicUrl: null,
+            }
+          }
+
+          return {
+            ...doc,
+            publicUrl: urlData?.signedUrl || null,
+          }
+        })
+      )
+
+      return { success: true, data: withUrls }
+    } catch (error) {
+      console.error('Unexpected error in getCustomerDocuments:', error)
+      return {
+        success: false,
+        data: [],
+        error: error.message || 'Failed to fetch documents',
+      }
+    }
+  },
+
+  // Delete a customer document (metadata + storage object)
+  deleteCustomerDocument: async (documentId) => {
+    try {
+      if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
+        console.log('🔧 Mock deleteCustomerDocument (Supabase not configured)', { documentId })
+        await new Promise(resolve => setTimeout(resolve, 200))
+        return { success: true, message: 'Document deleted (Mock Mode)' }
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from('customer_documents')
+        .select('*')
+        .eq('id', documentId)
+        .single()
+
+      if (fetchError) {
+        console.error('❌ Error fetching document before delete:', fetchError)
+        return { success: false, error: fetchError.message || 'Document not found' }
+      }
+
+      // Delete object from storage
+      if (data.bucket && data.object_path) {
+        const { error: storageError } = await supabase.storage
+          .from(data.bucket)
+          .remove([data.object_path])
+
+        if (storageError) {
+          console.error('⚠️ Error deleting document from storage:', storageError)
+          // continue to delete metadata anyway
+        }
+      }
+
+      const { error: deleteError } = await supabase
+        .from('customer_documents')
+        .delete()
+        .eq('id', documentId)
+
+      if (deleteError) {
+        console.error('❌ Error deleting document metadata:', deleteError)
+        return { success: false, error: deleteError.message || 'Failed to delete document' }
+      }
+
+      return { success: true, message: 'Document deleted successfully' }
+    } catch (error) {
+      console.error('Unexpected error in deleteCustomerDocument:', error)
+      return {
+        success: false,
+        error: error.message || 'Failed to delete document',
+      }
+    }
+  },
+
   // Get customers with pagination and filtering
   getCustomers: async (page = 1, limit = 50, filters = {}) => {
     try {
@@ -2968,6 +3298,35 @@ export const customerService = {
       }
       
       console.log('✅ Customer updated successfully:', result.data?.[0])
+
+      // Store risk assessment snapshot (inherent risk + triggered rules)
+      try {
+        const assessmentPayload = {
+          customer_id: customerId,
+          risk_score: roundedScore,
+          risk_level: riskResult.level,
+          triggered_rules: riskResult.triggeredRules || [],
+          assessment_date: new Date().toISOString(),
+        }
+
+        console.log('📝 Saving risk assessment snapshot:', {
+          customer_id: assessmentPayload.customer_id,
+          risk_score: assessmentPayload.risk_score,
+          risk_level: assessmentPayload.risk_level,
+          triggered_rules_count: assessmentPayload.triggered_rules.length,
+        })
+
+        const { error: assessmentError } = await supabase
+          .from('risk_assessments')
+          .insert(assessmentPayload)
+
+        if (assessmentError) {
+          console.error('⚠️ Failed to save risk assessment snapshot:', assessmentError)
+        }
+      } catch (snapshotError) {
+        console.error('⚠️ Error while saving risk assessment snapshot:', snapshotError)
+        // Do not fail the whole operation if snapshot save fails
+      }
       
       return { 
         success: true, 
