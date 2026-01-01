@@ -1574,28 +1574,98 @@ export const customerService = {
       
       console.log('🔗 Searching customers in real Supabase database...')
       
-      let query = supabase
+      const searchLower = searchTerm.toLowerCase()
+      const customerIds = new Set()
+      
+      // 1. Search in customers table (email, first_name, last_name)
+      let customersQuery = supabase
         .from('customers')
-        .select('*')
+        .select('id')
         .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
       
       // Add additional filters
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
-          query = query.eq(key, value)
+          customersQuery = customersQuery.eq(key, value)
         }
       })
       
-      const { data: customers, error } = await query
+      const { data: customersByMainFields, error: customersError } = await customersQuery
       
-      if (error) {
-        console.error('Supabase search error:', error)
-        return { success: false, error: error.message }
+      if (customersByMainFields) {
+        customersByMainFields.forEach(c => customerIds.add(c.id))
       }
+      
+      // 2. Search in natural_person_details (firstname, lastname)
+      const { data: npDetails, error: npError } = await supabase
+        .from('natural_person_details')
+        .select('customer_id')
+        .or(`firstname.ilike.%${searchTerm}%,lastname.ilike.%${searchTerm}%`)
+      
+      if (npDetails) {
+        npDetails.forEach(detail => customerIds.add(detail.customer_id))
+      }
+      
+      // 3. Search in legal_entity_details (legalname, alias)
+      const { data: leDetails, error: leError } = await supabase
+        .from('legal_entity_details')
+        .select('customer_id')
+        .or(`legalname.ilike.%${searchTerm}%,alias.ilike.%${searchTerm}%`)
+      
+      if (leDetails) {
+        leDetails.forEach(detail => customerIds.add(detail.customer_id))
+      }
+      
+      // If no matches found, return empty array
+      if (customerIds.size === 0) {
+        return { 
+          success: true,
+          data: []
+        }
+      }
+      
+      // Fetch full customer details for all matched IDs
+      let fullQuery = supabase
+        .from('customers')
+        .select(`
+          *,
+          natural_person_details (*),
+          legal_entity_details (*)
+        `)
+        .in('id', Array.from(customerIds))
+      
+      // Add additional filters
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          fullQuery = fullQuery.eq(key, value)
+        }
+      })
+      
+      const { data: customers, error: fetchError } = await fullQuery
+      
+      if (fetchError) {
+        console.error('Supabase fetch error:', fetchError)
+        return { success: false, error: fetchError.message }
+      }
+      
+      // Client-side filter to ensure search term matches (case-insensitive)
+      const filteredCustomers = (customers || []).filter(customer => {
+        const displayName = customer.customer_type === 'Natural Person' && customer.natural_person_details
+          ? `${customer.natural_person_details.firstname || ''} ${customer.natural_person_details.lastname || ''}`.trim().toLowerCase()
+          : customer.customer_type === 'Legal Entities' && customer.legal_entity_details
+          ? (customer.legal_entity_details.legalname || customer.legal_entity_details.alias || '').toLowerCase()
+          : `${customer.first_name || ''} ${customer.last_name || ''}`.trim().toLowerCase()
+        
+        return displayName.includes(searchLower) ||
+               (customer.email && customer.email.toLowerCase().includes(searchLower)) ||
+               (customer.first_name && customer.first_name.toLowerCase().includes(searchLower)) ||
+               (customer.last_name && customer.last_name.toLowerCase().includes(searchLower)) ||
+               (customer.id && customer.id.toLowerCase().includes(searchLower))
+      })
       
       return { 
         success: true,
-        data: customers || []
+        data: filteredCustomers
       }
     } catch (error) {
       console.error('Error searching customers:', error)

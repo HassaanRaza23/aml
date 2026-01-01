@@ -78,6 +78,140 @@ const ExpandableSection = ({ title, children }) => (
   </div>
 );
 
+// Component for Due Diligence Level and Verification Questions for an entity (collapsible)
+const EntityDueDiligenceSection = ({ 
+  entityId, 
+  entityName,
+  dueDiligenceLevel,
+  verificationChecks,
+  onVerificationCheckChange,
+  isExpanded,
+  onToggle
+}) => {
+  const questions = verificationService.getDefaultQuestions(dueDiligenceLevel);
+  
+  return (
+    <div className="mt-6 col-span-2">
+      <div className="bg-white rounded-xl shadow-sm mb-3 overflow-hidden border border-gray-100">
+        <div 
+          className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors duration-200"
+          onClick={onToggle}
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Due Diligence & Verification Checks
+              </h3>
+            </div>
+            <div className="flex items-center space-x-2 px-4 py-2 text-teal-600 hover:text-teal-700 rounded-lg transition-all duration-200">
+              <span className="text-sm font-medium">
+                {isExpanded ? 'Collapse' : 'Expand'}
+              </span>
+              <svg
+                className={`w-4 h-4 transition-transform duration-300 ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        {isExpanded && (
+          <div className="border-t border-gray-100 px-4 pb-4 pt-4">
+            <div className="space-y-4">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Due Diligence Level
+                </label>
+                <div className="w-full border border-gray-300 rounded-md p-2 bg-gray-50 text-gray-700">
+                  {dueDiligenceLevel}
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+        {questions.map((item, index) => {
+          if (item.type === "heading") {
+            return (
+              <div key={`heading-${entityId}-${index}`} className="mt-4 mb-3 first:mt-0">
+                <h5 className="text-base font-bold text-gray-800">{item.label}</h5>
+              </div>
+            );
+          }
+          
+          const { label, key } = item;
+          const fullKey = `${entityId}_${key}`;
+          return (
+            <div key={fullKey} className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+              <div className="flex items-center space-x-6 mb-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name={fullKey}
+                    value="yes"
+                    checked={verificationChecks[fullKey]?.answer === "yes"}
+                    onChange={() =>
+                      onVerificationCheckChange(fullKey, { answer: "yes", notes: verificationChecks[fullKey]?.notes || "" })
+                    }
+                  />
+                  <span>Yes</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name={fullKey}
+                    value="no"
+                    checked={verificationChecks[fullKey]?.answer === "no"}
+                    onChange={() =>
+                      onVerificationCheckChange(fullKey, { answer: "no", notes: "" })
+                    }
+                  />
+                  <span>No</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name={fullKey}
+                    value="n/a"
+                    checked={verificationChecks[fullKey]?.answer === "n/a"}
+                    onChange={() =>
+                      onVerificationCheckChange(fullKey, { answer: "n/a", notes: "" })
+                    }
+                  />
+                  <span>N/A</span>
+                </label>
+              </div>
+              {verificationChecks[fullKey]?.answer === "yes" && (
+                <textarea
+                  className="w-full border border-gray-300 rounded-md p-2"
+                  rows={3}
+                  placeholder="Add justification or notes..."
+                  value={verificationChecks[fullKey]?.notes || ""}
+                  onChange={(e) =>
+                    onVerificationCheckChange(fullKey, { 
+                      ...verificationChecks[fullKey], 
+                      notes: e.target.value 
+                    })
+                  }
+                />
+              )}
+            </div>
+          );
+        })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const KYCDetails = () => {
   const { customerId } = useParams();
   const navigate = useNavigate();
@@ -222,7 +356,7 @@ const KYCDetails = () => {
     }
   }, [customerId]);
 
-  // Update KYC status and load verification checks when customer data is loaded
+      // Update KYC status and load verification checks when customer data is loaded
   useEffect(() => {
     if (customerData) {
       setKycStatus(customerData.kyc_status || "Pending");
@@ -231,10 +365,68 @@ const KYCDetails = () => {
       // Set due diligence level from database (calculated during risk assessment)
       setDueDiligenceLevel(customerData.due_diligence_level || "Simplified Customer Due Diligence");
       
-      // Load verification checks
+      // Load verification checks for main customer
       loadVerificationChecks();
+      
+      // Load entity verification checks
+      loadEntityVerificationChecks();
     }
   }, [customerData, loadVerificationChecks]);
+
+  // Load entity verification checks for shareholders, UBOs, and directors
+  const loadEntityVerificationChecks = useCallback(async () => {
+    if (!customerData?.id) return;
+    
+    try {
+      const result = await verificationService.loadAllEntityVerificationChecks(customerData.id);
+      if (result.success && result.data) {
+        // Set shareholder checks
+        // Note: Keys in state use format: shareholder_${sh.id || i}_${checkType}
+        if (result.data.shareholders) {
+          const shareholderChecks = {};
+          shareholders.forEach((sh, i) => {
+            const entityId = sh.id || i;
+            if (result.data.shareholders[entityId]) {
+              Object.entries(result.data.shareholders[entityId]).forEach(([checkType, check]) => {
+                shareholderChecks[`shareholder_${entityId}_${checkType}`] = check;
+              });
+            }
+          });
+          setShareholderVerificationChecks(shareholderChecks);
+        }
+        
+        // Set UBO checks
+        if (result.data.ubos) {
+          const uboChecks = {};
+          ubos.forEach((ubo, i) => {
+            const entityId = ubo.id || i;
+            if (result.data.ubos[entityId]) {
+              Object.entries(result.data.ubos[entityId]).forEach(([checkType, check]) => {
+                uboChecks[`ubo_${entityId}_${checkType}`] = check;
+              });
+            }
+          });
+          setUboVerificationChecks(uboChecks);
+        }
+        
+        // Set director checks
+        if (result.data.directors) {
+          const directorChecks = {};
+          directors.forEach((director, i) => {
+            const entityId = director.id || i;
+            if (result.data.directors[entityId]) {
+              Object.entries(result.data.directors[entityId]).forEach(([checkType, check]) => {
+                directorChecks[`director_${entityId}_${checkType}`] = check;
+              });
+            }
+          });
+          setDirectorVerificationChecks(directorChecks);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading entity verification checks:', error);
+    }
+  }, [customerData?.id, shareholders, ubos, directors]);
 
 
   // Local state for KYC assessment inputs
@@ -244,6 +436,12 @@ const KYCDetails = () => {
   const [remarksError, setRemarksError] = useState("");
 
   const [verificationChecks, setVerificationChecks] = useState({});
+
+  // State for verification checks for shareholders, UBOs, and directors
+  // Note: Due diligence level is inherited from main customer (dueDiligenceLevel)
+  const [shareholderVerificationChecks, setShareholderVerificationChecks] = useState({});
+  const [uboVerificationChecks, setUboVerificationChecks] = useState({});
+  const [directorVerificationChecks, setDirectorVerificationChecks] = useState({});
   
   // State for expandable sections
   const [expandedSections, setExpandedSections] = useState({
@@ -252,11 +450,14 @@ const KYCDetails = () => {
     bankDetails: false,
     ubos: false
   });
+  
+  // State for entity due diligence sections (shareholders, UBOs, directors)
+  const [expandedDDSections, setExpandedDDSections] = useState({});
 
   // Show loading state
   if (loading) {
-    return (
-      <div className="p-6 max-w-6xl mx-auto">
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <span className="ml-3 text-gray-600">Loading customer data...</span>
@@ -372,7 +573,7 @@ const KYCDetails = () => {
             <ReadOnlyField label="Country of Incorporation" value={customerDetails?.countryofincorporation || '—'} />
             <ReadOnlyField label="Jurisdiction" value={cleanFieldValue(customerDetails?.jurisdiction)} />
             <ReadOnlyField label="Management Company" value={customerDetails?.managementcompany || '—'} />
-          </Section>
+      </Section>
 
           {/* Regulatory Compliance */}
           <Section title="Regulatory Compliance">
@@ -568,6 +769,20 @@ const KYCDetails = () => {
                             <ReadOnlyField label="Trustee Type" value={sh.trusteeType || '—'} />
                           </>
                         )}
+                        
+                        {/* Due Diligence and Verification Checks for Shareholder (all types) */}
+                        <EntityDueDiligenceSection
+                          entityId={`shareholder_${sh.id || i}`}
+                          entityName={sh.type === 'Natural Person' ? sh.fullName : sh.type === 'Legal Entities' ? sh.legalName : sh.trustName || `Shareholder ${i + 1}`}
+                          dueDiligenceLevel={dueDiligenceLevel}
+                          verificationChecks={shareholderVerificationChecks}
+                          onVerificationCheckChange={(key, value) => setShareholderVerificationChecks(prev => ({ ...prev, [key]: value }))}
+                          isExpanded={expandedDDSections[`shareholder_${sh.id || i}`] || false}
+                          onToggle={() => setExpandedDDSections(prev => ({
+                            ...prev,
+                            [`shareholder_${sh.id || i}`]: !prev[`shareholder_${sh.id || i}`]
+                          }))}
+                        />
                       </SubSection>
                     ))}
                   </div>
@@ -661,6 +876,20 @@ const KYCDetails = () => {
                         <ReadOnlyField label="Is CEO" value={director.isCeo ? 'Yes' : 'No'} />
                         <ReadOnlyField label="Is Representative" value={director.isRepresentative ? 'Yes' : 'No'} />
                         <ReadOnlyField label="Dual Nationality" value={director.dualNationality|| '—'} />
+                        
+                        {/* Due Diligence and Verification Checks for Director */}
+                        <EntityDueDiligenceSection
+                          entityId={`director_${director.id || i}`}
+                          entityName={`${director.firstName || ''} ${director.lastName || ''}`.trim() || `Director ${i + 1}`}
+                          dueDiligenceLevel={dueDiligenceLevel}
+                          verificationChecks={directorVerificationChecks}
+                          onVerificationCheckChange={(key, value) => setDirectorVerificationChecks(prev => ({ ...prev, [key]: value }))}
+                          isExpanded={expandedDDSections[`director_${director.id || i}`] || false}
+                          onToggle={() => setExpandedDDSections(prev => ({
+                            ...prev,
+                            [`director_${director.id || i}`]: !prev[`director_${director.id || i}`]
+                          }))}
+                        />
                       </SubSection>
                     ))}
                   </div>
@@ -834,6 +1063,20 @@ const KYCDetails = () => {
                         <ReadOnlyField label="Expected Income" value={ubo.expectedIncome || '—'} />
                         <ReadOnlyField label="PEP Status" value={ubo.pep || '—'} />
                         <ReadOnlyField label="Dual Nationality" value={ubo.dualNationality || '—'} />
+                        
+                        {/* Due Diligence and Verification Checks for UBO */}
+                        <EntityDueDiligenceSection
+                          entityId={`ubo_${ubo.id || i}`}
+                          entityName={ubo.fullName || `UBO ${i + 1}`}
+                          dueDiligenceLevel={dueDiligenceLevel}
+                          verificationChecks={uboVerificationChecks}
+                          onVerificationCheckChange={(key, value) => setUboVerificationChecks(prev => ({ ...prev, [key]: value }))}
+                          isExpanded={expandedDDSections[`ubo_${ubo.id || i}`] || false}
+                          onToggle={() => setExpandedDDSections(prev => ({
+                            ...prev,
+                            [`ubo_${ubo.id || i}`]: !prev[`ubo_${ubo.id || i}`]
+                          }))}
+                        />
                       </SubSection>
                     ))}
                   </div>
@@ -1002,7 +1245,7 @@ const KYCDetails = () => {
                   return;
                 }
 
-                // Save verification checks first
+                // Save verification checks for main customer first
                 const verificationResult = await verificationService.saveVerificationChecks(
                   customerData.id, 
                   verificationChecks
@@ -1011,6 +1254,108 @@ const KYCDetails = () => {
                 if (!verificationResult.success) {
                   toast.error(`Failed to save verification checks: ${verificationResult.error}`);
                   return;
+                }
+                
+                // Save verification checks for shareholders, UBOs, and directors
+                // Note: entity_id references the primary key (id) from:
+                // - customer_shareholders.id for shareholders
+                // - customer_ubos.id for UBOs
+                // - customer_directors.id for directors
+                
+                // Save verification checks for shareholders
+                // Keys format: shareholder_${sh.id || i}_${checkType}
+                // entity_id: sh.id (primary key from customer_shareholders table)
+                if (shareholders && shareholders.length > 0) {
+                  for (let i = 0; i < shareholders.length; i++) {
+                    const sh = shareholders[i];
+                    const entityId = sh.id || i;
+                    const entityKeyPrefix = `shareholder_${entityId}_`;
+                    
+                    // Extract checks for this shareholder
+                    const entityChecks = {};
+                    Object.entries(shareholderVerificationChecks).forEach(([key, check]) => {
+                      if (key.startsWith(entityKeyPrefix)) {
+                        const checkType = key.replace(entityKeyPrefix, '');
+                        entityChecks[checkType] = check;
+                      }
+                    });
+                    
+                    if (Object.keys(entityChecks).length > 0 && sh.id) {
+                      const shResult = await verificationService.saveEntityVerificationChecks(
+                        customerData.id,
+                        'shareholder',
+                        sh.id,
+                        entityChecks
+                      );
+                      if (!shResult.success) {
+                        console.error(`Failed to save checks for shareholder ${sh.id}:`, shResult.error);
+                      }
+                    }
+                  }
+                }
+                
+                // Save verification checks for UBOs
+                // Keys format: ubo_${ubo.id || i}_${checkType}
+                // entity_id: ubo.id (primary key from customer_ubos table)
+                if (ubos && ubos.length > 0) {
+                  for (let i = 0; i < ubos.length; i++) {
+                    const ubo = ubos[i];
+                    const entityId = ubo.id || i;
+                    const entityKeyPrefix = `ubo_${entityId}_`;
+                    
+                    // Extract checks for this UBO
+                    const entityChecks = {};
+                    Object.entries(uboVerificationChecks).forEach(([key, check]) => {
+                      if (key.startsWith(entityKeyPrefix)) {
+                        const checkType = key.replace(entityKeyPrefix, '');
+                        entityChecks[checkType] = check;
+                      }
+                    });
+                    
+                    if (Object.keys(entityChecks).length > 0 && ubo.id) {
+                      const uboResult = await verificationService.saveEntityVerificationChecks(
+                        customerData.id,
+                        'ubo',
+                        ubo.id,
+                        entityChecks
+                      );
+                      if (!uboResult.success) {
+                        console.error(`Failed to save checks for UBO ${ubo.id}:`, uboResult.error);
+                      }
+                    }
+                  }
+                }
+                
+                // Save verification checks for directors
+                // Keys format: director_${director.id || i}_${checkType}
+                // entity_id: director.id (primary key from customer_directors table)
+                if (directors && directors.length > 0) {
+                  for (let i = 0; i < directors.length; i++) {
+                    const director = directors[i];
+                    const entityId = director.id || i;
+                    const entityKeyPrefix = `director_${entityId}_`;
+                    
+                    // Extract checks for this director
+                    const entityChecks = {};
+                    Object.entries(directorVerificationChecks).forEach(([key, check]) => {
+                      if (key.startsWith(entityKeyPrefix)) {
+                        const checkType = key.replace(entityKeyPrefix, '');
+                        entityChecks[checkType] = check;
+                      }
+                    });
+                    
+                    if (Object.keys(entityChecks).length > 0 && director.id) {
+                      const dirResult = await verificationService.saveEntityVerificationChecks(
+                        customerData.id,
+                        'director',
+                        director.id,
+                        entityChecks
+                      );
+                      if (!dirResult.success) {
+                        console.error(`Failed to save checks for director ${director.id}:`, dirResult.error);
+                      }
+                    }
+                  }
                 }
 
                 // Update customer KYC status, remarks, and due diligence level

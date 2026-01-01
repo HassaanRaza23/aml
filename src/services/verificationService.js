@@ -7,11 +7,12 @@ export const verificationService = {
       const { data: user } = await supabase.auth.getUser();
       const userId = user?.user?.id || '00000000-0000-0000-0000-000000000001'; // Demo user fallback
 
-      // First, delete existing checks for this customer
+      // First, delete existing checks for this customer (main customer only, not entity checks)
       const { error: deleteError } = await supabase
         .from('customer_verification_checks')
         .delete()
-        .eq('customer_id', customerId);
+        .eq('customer_id', customerId)
+        .is('entity_type', null);
 
       if (deleteError) {
         console.error('Error deleting existing checks:', deleteError);
@@ -53,13 +54,14 @@ export const verificationService = {
     }
   },
 
-  // Load verification checks for a customer
+  // Load verification checks for a customer (main customer only)
   async loadVerificationChecks(customerId) {
     try {
       const { data, error } = await supabase
         .from('customer_verification_checks')
         .select('*')
         .eq('customer_id', customerId)
+        .is('entity_type', null)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -80,6 +82,144 @@ export const verificationService = {
       return { success: true, data: verificationChecks };
     } catch (error) {
       console.error('Error in loadVerificationChecks:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Save verification checks for a specific entity (shareholder, UBO, or director)
+  async saveEntityVerificationChecks(customerId, entityType, entityId, verificationChecks) {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      const userId = user?.user?.id || '00000000-0000-0000-0000-000000000001'; // Demo user fallback
+
+      if (!entityType || !entityId) {
+        return { success: false, error: 'Entity type and ID are required' };
+      }
+
+      // First, delete existing checks for this entity
+      const { error: deleteError } = await supabase
+        .from('customer_verification_checks')
+        .delete()
+        .eq('customer_id', customerId)
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId);
+
+      if (deleteError) {
+        console.error('Error deleting existing entity checks:', deleteError);
+        return { success: false, error: deleteError.message };
+      }
+
+      // Prepare checks data for insertion
+      const checksToInsert = Object.entries(verificationChecks)
+        .filter(([_, check]) => check.answer) // Only insert checks that have been answered
+        .map(([checkType, check]) => ({
+          customer_id: customerId,
+          entity_type: entityType,
+          entity_id: entityId,
+          check_type: checkType,
+          check_question: check.question || this.getQuestionByType(checkType),
+          answer: check.answer,
+          notes: check.notes || null,
+          checked_by: userId,
+          checked_at: new Date().toISOString()
+        }));
+
+      if (checksToInsert.length === 0) {
+        return { success: true, data: [], message: 'No verification checks to save' };
+      }
+
+      // Insert new checks
+      const { data, error } = await supabase
+        .from('customer_verification_checks')
+        .insert(checksToInsert)
+        .select();
+
+      if (error) {
+        console.error('Error saving entity verification checks:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data, message: 'Entity verification checks saved successfully' };
+    } catch (error) {
+      console.error('Error in saveEntityVerificationChecks:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Load verification checks for a specific entity
+  async loadEntityVerificationChecks(customerId, entityType, entityId) {
+    try {
+      if (!entityType || !entityId) {
+        return { success: true, data: {} };
+      }
+
+      const { data, error } = await supabase
+        .from('customer_verification_checks')
+        .select('*')
+        .eq('customer_id', customerId)
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading entity verification checks:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Transform data to match the expected format
+      const verificationChecks = {};
+      data.forEach(check => {
+        verificationChecks[check.check_type] = {
+          answer: check.answer,
+          notes: check.notes || '',
+          question: check.check_question
+        };
+      });
+
+      return { success: true, data: verificationChecks };
+    } catch (error) {
+      console.error('Error in loadEntityVerificationChecks:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Load all entity verification checks for a customer (shareholders, UBOs, directors)
+  async loadAllEntityVerificationChecks(customerId) {
+    try {
+      const { data, error } = await supabase
+        .from('customer_verification_checks')
+        .select('*')
+        .eq('customer_id', customerId)
+        .not('entity_type', 'is', null)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading all entity verification checks:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Group checks by entity type and entity ID
+      const entityChecks = {
+        shareholders: {},
+        ubos: {},
+        directors: {}
+      };
+
+      data.forEach(check => {
+        const key = `${check.entity_type}_${check.entity_id}`;
+        if (!entityChecks[check.entity_type][check.entity_id]) {
+          entityChecks[check.entity_type][check.entity_id] = {};
+        }
+        entityChecks[check.entity_type][check.entity_id][check.check_type] = {
+          answer: check.answer,
+          notes: check.notes || '',
+          question: check.check_question
+        };
+      });
+
+      return { success: true, data: entityChecks };
+    } catch (error) {
+      console.error('Error in loadAllEntityVerificationChecks:', error);
       return { success: false, error: error.message };
     }
   },

@@ -18,6 +18,7 @@ import KYCDetails from './pages/Customer/KYCDetails';
 import RiskProfile from './pages/Customer/RiskProfile';
 import RiskMitigation from './pages/Customer/RiskMitigation';
 import DocumentUpload from './pages/Customer/DocumentUpload';
+import SanctionDetails from './pages/Customer/SanctionDetails';
 
 // Screening
 import InstantScreening from './pages/Screening/InstantScreening';
@@ -26,10 +27,10 @@ import MonitoringList from './pages/Screening/MonitoringList';
 import ScreeningHistory from './pages/Screening/ScreeningHistory';
 import CaseDetailView from './pages/Screening/CaseDetailView';
 
-// Monitoring
+// Transactions
 import AddTransaction from './pages/Monitoring/AddTransaction';
-import TransactionMonitoring from './pages/Monitoring/TransactionMonitoring';
-import Alerts from './pages/Monitoring/Alerts';
+import TransactionApprovals from './pages/Monitoring/TransactionApprovals';
+import TransactionReports from './pages/Monitoring/TransactionReports';
 import TransactionRules from './pages/Monitoring/TransactionRules';
 
 // Risk
@@ -83,6 +84,7 @@ const App = () => {
                 <Route path="customer/risk-profile/:customerId" element={<RiskProfile />} />
                 <Route path="customer/risk-mitigation/:customerId" element={<RiskMitigation />} />
                 <Route path="customer/documents/:customerId" element={<DocumentUpload />} />
+                <Route path="customer/sanction-details/:customerId" element={<SanctionDetails />} />
 
                 {/* Screening */}
                 <Route path="screening/instant" element={<InstantScreening />} />
@@ -91,11 +93,11 @@ const App = () => {
                 <Route path="/screening/screeninghistory" element={<ScreeningHistory />} />
                 <Route path="/screening/casedetails" element={<CaseDetailView />} />
 
-                {/* Monitoring */}
-                <Route path="monitoring/addtransactions" element={<AddTransaction />} />
-                <Route path="monitoring/transactions" element={<TransactionMonitoring />} />
-                <Route path="monitoring/alerts" element={<Alerts />} />
-                <Route path="monitoring/transactionrules" element={<TransactionRules />} />
+                {/* Transactions */}
+                <Route path="transactions/addtransactions" element={<AddTransaction />} />
+                <Route path="transactions/approvals" element={<TransactionApprovals />} />
+                <Route path="transactions/reports" element={<TransactionReports />} />
+                <Route path="transactions/transactionrules" element={<TransactionRules />} />
 
                 {/* Risk */}
                 <Route path="risk/assessment" element={<RiskAssessment />} />

@@ -329,6 +329,12 @@ const CustomerList = () => {
     setExpandedRows(new Set());
   }, [navigate]);
 
+  // Handle sanction details
+  const handleSanctionDetails = useCallback((customerId) => {
+    navigate(`/customer/sanction-details/${customerId}`);
+    setExpandedRows(new Set());
+  }, [navigate]);
+
   // Handle customer update
   const handleUpdateCustomer = useCallback(async (updatedData) => {
     try {
@@ -494,7 +500,7 @@ const CustomerList = () => {
             Add Customer
           </button>
           
-          <button
+          {/* <button
             onClick={handleReEvaluateRisk}
             disabled={loading || reEvaluating}
             className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition duration-200 flex items-center gap-2 shadow-sm"
@@ -512,7 +518,7 @@ const CustomerList = () => {
                 Re-evaluate Risk
               </>
             )}
-          </button>
+          </button> */}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -672,6 +678,15 @@ const CustomerList = () => {
                           className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
                         >
                           Document Upload
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSanctionDetails(cust.id);
+                          }}
+                          className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200"
+                        >
+                          Sanction Details
                         </button>
                   <button
                           onClick={(e) => {

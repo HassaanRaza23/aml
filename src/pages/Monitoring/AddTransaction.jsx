@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import { countries } from "../../data/countries";
-import { currencies } from "../../data/currencies";
-import { sourceOfFunds } from "../../data/dropdownOptions";
 import { customerService, transactionService, caseService } from "../../services";
 import { toast } from "react-toastify";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { currencies } from "../../data/currencies";
+import { 
+  sourceOfFunds, 
+  transactionProducts, 
+  channelOptions, 
+  yesNoOptions,
+  paymentModes,
+  transactionPurposes,
+  statusCodes,
+  itemTypes,
+  executedByOptions
+} from "../../data/dropdownOptions";
 
 const AddTransaction = () => {
   const [tab, setTab] = useState("manual");
@@ -11,17 +21,44 @@ const AddTransaction = () => {
   
   // Form state
   const [formData, setFormData] = useState({
+    // Customer fields
     customerName: "",
     customerId: "",
-    transactionDate: "",
-    amount: "",
-    currency: "",
-    transactionType: "",
-    country: "",
-    counterpartyName: "",
+    customerType: "",
+    directorId: "",
+    directorName: "",
+    // Required fields
+    descriptionOfReport: "",
+    actionTakenByReportingEntity: "",
+    date: "",
+    internalReferenceNumber: "",
+    transactionProduct: "",
+    paymentMode: "",
+    channel: "",
     sourceOfFunds: "",
-    purpose: "",
-    description: ""
+    transactionPurpose: "",
+    currency: "",
+    rate: "",
+    invoiceAmount: "",
+    itemType: "",
+    statusCode: "",
+    reason: "",
+    description: "",
+    // Optional fields
+    beneficiaryName: "",
+    beneficiaryComments: "",
+    lateDeposit: "",
+    branch: "",
+    indemnifiedForRepatriation: "",
+    executedBy: "",
+    amountLc: "",
+    estimatedAmount: "",
+    itemSize: "",
+    itemUnit: "",
+    statusComments: "",
+    carrierName: "",
+    carrierDetails: "",
+    isStrIstr: false
   });
 
   // Validation state
@@ -29,12 +66,17 @@ const AddTransaction = () => {
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Customer search state
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [customerResults, setCustomerResults] = useState([]);
+  // Customer dropdown state
+  const [allCustomers, setAllCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
+  const [customerInputValue, setCustomerInputValue] = useState("");
   const customerDropdownRef = useRef(null);
+
+  // Selected customer details
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [directors, setDirectors] = useState([]);
+  const [loadingDirectors, setLoadingDirectors] = useState(false);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -45,55 +87,80 @@ const AddTransaction = () => {
     switch (name) {
       case 'customerName':
         if (!value.trim()) return 'Customer Name is required';
-        if (value.trim().length < 2) return 'Customer Name must be at least 2 characters';
-        if (value.trim().length > 100) return 'Customer Name must be less than 100 characters';
         return '';
 
-      case 'transactionDate':
-        if (!value) return 'Transaction Date is required';
-        const selectedDate = new Date(value);
-        const today = new Date();
-        if (selectedDate > today) return 'Transaction Date cannot be in the future';
+      case 'directorId':
+        if (formData.customerType === 'Legal Entities' && !value) {
+          return 'Director/Representative is required for Legal Entities';
+        }
         return '';
 
-      case 'amount':
-        if (!value) return 'Amount is required';
-        const amount = parseFloat(value);
-        if (isNaN(amount)) return 'Amount must be a valid number';
-        if (amount <= 0) return 'Amount must be greater than 0';
-        if (amount > 999999999.99) return 'Amount is too large';
+      case 'descriptionOfReport':
+        if (!value.trim()) return 'Description of the Report is required';
+        return '';
+
+      case 'actionTakenByReportingEntity':
+        if (!value.trim()) return 'Action taken by reporting entity is required';
+        return '';
+
+      case 'date':
+        if (!value) return 'Date is required';
+        return '';
+
+      case 'internalReferenceNumber':
+        if (!value.trim()) return 'Internal reference number is required';
+        return '';
+
+      case 'transactionProduct':
+        if (!value) return 'Transaction product is required';
+        return '';
+
+      case 'paymentMode':
+        if (!value) return 'Payment Mode is required';
+        return '';
+
+      case 'channel':
+        if (!value) return 'Channel is required';
+        return '';
+
+      case 'sourceOfFunds':
+        if (!value) return 'Source of funds is required';
+        return '';
+
+      case 'transactionPurpose':
+        if (!value) return 'Transaction purpose is required';
         return '';
 
       case 'currency':
         if (!value) return 'Currency is required';
         return '';
 
-      case 'transactionType':
-        if (!value) return 'Transaction Type is required';
+      case 'rate':
+        if (!value) return 'Rate is required';
+        const rate = parseFloat(value);
+        if (isNaN(rate) || rate <= 0) return 'Rate must be a positive number';
         return '';
 
-      case 'country':
-        if (!value) return 'Country is required';
+      case 'invoiceAmount':
+        if (!value) return 'Invoice amount is required';
+        const amount = parseFloat(value);
+        if (isNaN(amount) || amount <= 0) return 'Invoice amount must be a positive number';
         return '';
 
-      case 'counterpartyName':
-        if (!value.trim()) return 'Counterparty Name is required';
-        if (value.trim().length < 2) return 'Counterparty Name must be at least 2 characters';
-        if (value.trim().length > 100) return 'Counterparty Name must be less than 100 characters';
+      case 'itemType':
+        if (!value) return 'Item type is required';
         return '';
 
-      case 'sourceOfFunds':
-        if (!value) return 'Source of Funds is required';
+      case 'statusCode':
+        if (!value) return 'Status code is required';
         return '';
 
-      case 'purpose':
-        if (!value.trim()) return 'Purpose of Transaction is required';
-        if (value.trim().length < 5) return 'Purpose must be at least 5 characters';
-        if (value.trim().length > 200) return 'Purpose must be less than 200 characters';
+      case 'reason':
+        if (!value.trim()) return 'Reason is required';
         return '';
 
       case 'description':
-        if (value && value.trim().length > 500) return 'Description must be less than 500 characters';
+        if (!value.trim()) return 'Description is required';
         return '';
 
       default:
@@ -102,11 +169,13 @@ const AddTransaction = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    const fieldValue = type === 'checkbox' ? checked : value;
+    
+    setFormData(prev => ({ ...prev, [name]: fieldValue }));
     
     // Validate field on change
-    const error = validateField(name, value);
+    const error = validateField(name, fieldValue);
     setErrors(prev => ({
       ...prev,
       [name]: error
@@ -120,6 +189,8 @@ const AddTransaction = () => {
 
   const validateForm = () => {
     const newErrors = {};
+    
+    // Validate all required fields
     Object.keys(formData).forEach(field => {
       const error = validateField(field, formData[field]);
       if (error) {
@@ -127,77 +198,110 @@ const AddTransaction = () => {
       }
     });
     
-    // Additional validation for customer selection
     if (!formData.customerId) {
       newErrors.customerName = 'Please select a customer from the dropdown';
+    }
+    
+    if (formData.customerType === 'Legal Entities' && !formData.directorId) {
+      newErrors.directorId = 'Please select a director/representative';
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Customer search functionality
-  const searchCustomers = async (searchTerm) => {
-    if (searchTerm.length < 2) {
-      setCustomerResults([]);
-      setShowCustomerDropdown(false);
-      return;
+  // Get customer display name
+  const getCustomerDisplayName = (customer) => {
+    if (customer.customer_type === 'Natural Person' && customer.natural_person_details) {
+      const firstName = customer.natural_person_details.firstname || '';
+      const lastName = customer.natural_person_details.lastname || '';
+      return `${firstName} ${lastName}`.trim() || 'Natural Person';
+    } else if (customer.customer_type === 'Legal Entities' && customer.legal_entity_details) {
+      return customer.legal_entity_details.legalname || customer.legal_entity_details.alias || 'Legal Entity';
     }
+    // Fallback to first_name/last_name if details not loaded
+    if (customer.first_name && customer.last_name) {
+      return `${customer.first_name} ${customer.last_name}`.trim();
+    }
+    return customer.first_name || customer.alias || 'Customer';
+  };
 
-    console.log('🔍 Searching for customers with term:', searchTerm);
-    setIsSearchingCustomers(true);
+  // Load all customers
+  const loadAllCustomers = async () => {
+    if (allCustomers.length > 0) return; // Already loaded
     
+    setLoadingCustomers(true);
     try {
-      const result = await customerService.searchCustomers(searchTerm);
-      console.log('🔍 Search result:', result);
-      
-      if (result.success) {
-        console.log('✅ Found customers:', result.data);
-        setCustomerResults(result.data || []);
-        setShowCustomerDropdown(true);
-      } else {
-        console.log('❌ Search failed:', result.error);
-        setCustomerResults([]);
-        setShowCustomerDropdown(false);
+      // Fetch all customers with pagination (get a large number)
+      const result = await customerService.getCustomers(1, 1000);
+      if (result.success && result.data) {
+        setAllCustomers(result.data);
       }
     } catch (error) {
-      console.error('Error searching customers:', error);
-      setCustomerResults([]);
-      setShowCustomerDropdown(false);
+      console.error('Error loading customers:', error);
+      toast.error('Failed to load customers');
     } finally {
-      setIsSearchingCustomers(false);
+      setLoadingCustomers(false);
     }
   };
 
-  const handleCustomerSearchChange = (e) => {
-    const value = e.target.value;
-    setCustomerSearch(value);
-    setFormData(prev => ({ ...prev, customerName: value, customerId: "" }));
-    
-    // Debounce search
-    const timeoutId = setTimeout(() => {
-      searchCustomers(value);
-    }, 300);
 
-    return () => clearTimeout(timeoutId);
-  };
-
-  const handleCustomerSelect = (customer) => {
-    setCustomerSearch(`${customer.first_name} ${customer.last_name} (${customer.id})`);
+  const handleCustomerSelect = async (customer) => {
+    const displayName = getCustomerDisplayName(customer);
+    setCustomerInputValue(displayName);
     setFormData(prev => ({ 
       ...prev, 
-      customerName: `${customer.first_name} ${customer.last_name}`,
-      customerId: customer.id 
+      customerName: displayName,
+      customerId: customer.id,
+      customerType: customer.customer_type || customer.customerType || '',
+      directorId: "",
+      directorName: ""
     }));
+    setSelectedCustomer(customer);
     setShowCustomerDropdown(false);
-    setCustomerResults([]);
+    
+    // If legal entity, fetch directors
+    const customerType = customer.customer_type || customer.customerType;
+    if (customerType === 'Legal Entities') {
+      setLoadingDirectors(true);
+      try {
+        const directorsResult = await customerService.getDirectors(customer.id);
+        if (directorsResult.success) {
+          setDirectors(directorsResult.data || []);
+        } else {
+          console.error('Failed to fetch directors:', directorsResult.error);
+          setDirectors([]);
+        }
+      } catch (error) {
+        console.error('Error fetching directors:', error);
+        setDirectors([]);
+      } finally {
+        setLoadingDirectors(false);
+      }
+    } else {
+      setDirectors([]);
+    }
   };
+
+  // Load customers on component mount
+  useEffect(() => {
+    loadAllCustomers();
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target)) {
         setShowCustomerDropdown(false);
+        // Reset input to selected customer name if a customer is selected
+        if (formData.customerId) {
+          const selectedCustomer = allCustomers.find(c => c.id === formData.customerId);
+          if (selectedCustomer) {
+            setCustomerInputValue(getCustomerDisplayName(selectedCustomer));
+          }
+        } else {
+          setCustomerInputValue("");
+        }
       }
     };
 
@@ -205,7 +309,43 @@ const AddTransaction = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [formData.customerId, allCustomers]);
+
+  // Filter customers based on input value
+  const filteredCustomers = allCustomers.filter(customer => {
+    if (!customerInputValue.trim()) return true;
+    
+    const searchLower = customerInputValue.toLowerCase();
+    const displayName = getCustomerDisplayName(customer).toLowerCase();
+    const customerType = (customer.customer_type || customer.customerType || '').toLowerCase();
+    const customerId = (customer.id || '').toLowerCase();
+    
+    return displayName.includes(searchLower) || 
+           customerType.includes(searchLower) || 
+           customerId.includes(searchLower);
+  });
+
+  // Handle customer input change
+  const handleCustomerInputChange = (e) => {
+    const value = e.target.value;
+    setCustomerInputValue(value);
+    setShowCustomerDropdown(true);
+    
+    // Clear selection if input is cleared
+    if (!value.trim()) {
+      setFormData(prev => ({ 
+        ...prev, 
+        customerName: "",
+        customerId: "",
+        customerType: "",
+        directorId: "",
+        directorName: ""
+      }));
+      setSelectedCustomer(null);
+      setDirectors([]);
+    }
+  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -222,119 +362,107 @@ const AddTransaction = () => {
       return;
     }
 
-    if (!formData.customerId) {
-      toast.error('Please select a valid customer from the dropdown');
-      return;
-    }
-
     setIsSubmitting(true);
     
     try {
       console.log('🔍 Processing transaction submission...');
+      console.log('📊 Form data:', formData);
       
-      // Prepare transaction data for risk assessment
-      const transactionData = {
+      // Map form data to transaction payload (camelCase to snake_case)
+      const transactionPayload = {
         customer_id: formData.customerId,
-        transaction_type: formData.transactionType,
-        amount: formData.amount, // Keep as string for rule evaluation
+        director_id: formData.directorId || null,
+        transaction_type: formData.paymentMode || null,
+        amount: parseFloat(formData.invoiceAmount) || 0,
         currency: formData.currency,
-        transaction_date: formData.transactionDate,
-        source_account: formData.customerName, // Using customer name as source
-        destination_account: formData.counterpartyName,
-        description: formData.description,
-        // Additional data for risk assessment (stored in description for now)
-        // We'll include risk assessment data in the description field
-        // since the transactions table doesn't have dedicated columns for these
-        risk_assessment_data: {
-          destination_country: formData.country,
-          source_of_funds: formData.sourceOfFunds,
-          purpose: formData.purpose,
-          // Risk assessment flags (these would be determined by the rules)
-          is_unusual_pattern: false, // Would be determined by historical analysis
-          involves_third_party: formData.counterpartyName !== formData.customerName,
-          is_structuring: false, // Would be determined by pattern analysis
-          involves_pep: false, // Would be determined by screening
-          involves_sanctioned_entity: false, // Would be determined by screening
-          frequency: 1, // Would be determined by historical analysis
-        },
-        // Test scenarios for demonstration
-        // Uncomment these lines to test different risk scenarios:
-        // amount: "15000", // High amount test (+30 points)
-        // risk_assessment_data: { destination_country: "IR" }, // High-risk country test (+40 points)
-        // transaction_type: "Cash", // Cash transaction test (+45 points)
-        // For testing, you can also try:
-        // risk_assessment_data: { destination_country: "KY" }, // Offshore jurisdiction test (+30 points)
-        // amount: "6000", // Cash-like amount for testing
+        transaction_date: formData.date || new Date().toISOString(),
+        source_account: formData.customerName || null,
+        destination_account: formData.beneficiaryName || null,
+        description_of_report: formData.descriptionOfReport || null,
+        action_taken_by_reporting_entity: formData.actionTakenByReportingEntity || null,
+        internal_reference_number: formData.internalReferenceNumber || null,
+        transaction_product: formData.transactionProduct || null,
+        payment_mode: formData.paymentMode || null,
+        channel: formData.channel || null,
+        source_of_funds: formData.sourceOfFunds || null,
+        transaction_purpose: formData.transactionPurpose || null,
+        rate: formData.rate ? parseFloat(formData.rate) : null,
+        invoice_amount: formData.invoiceAmount ? parseFloat(formData.invoiceAmount) : null,
+        amount_lc: formData.amountLc ? parseFloat(formData.amountLc) : null,
+        estimated_amount: formData.estimatedAmount ? parseFloat(formData.estimatedAmount) : null,
+        item_type: formData.itemType || null,
+        item_size: formData.itemSize || null,
+        item_unit: formData.itemUnit || null,
+        status_code: formData.statusCode || null,
+        status_comments: formData.statusComments || null,
+        beneficiary_name: formData.beneficiaryName || null,
+        beneficiary_comments: formData.beneficiaryComments || null,
+        late_deposit: formData.lateDeposit || null,
+        branch: formData.branch || null,
+        indemnified_for_repatriation: formData.indemnifiedForRepatriation || null,
+        executed_by: formData.executedBy || null,
+        carrier_name: formData.carrierName || null,
+        carrier_details: formData.carrierDetails || null,
+        is_str_istr: formData.isStrIstr || false,
+        reason: formData.reason || null,
+        description: formData.description || null
       };
-
-      console.log('📊 Transaction data prepared:', transactionData);
-
-      // Create transaction with risk assessment
-      const transaction = await transactionService.createTransaction(transactionData);
       
-      if (!transaction) {
-        throw new Error('Failed to create transaction');
+      console.log('📊 Transaction payload:', transactionPayload);
+      
+      // Create transaction
+      const transaction = await transactionService.createTransaction(transactionPayload);
+      
+      if (!transaction || (transaction.success === false)) {
+        throw new Error(transaction?.error || 'Failed to create transaction');
       }
-
-      console.log('✅ Transaction created:', transaction);
-      console.log('📊 Transaction risk score:', transaction.risk_score);
-      console.log('📊 Transaction status:', transaction.status);
-
-      // Check if case should be created based on risk score and status
-      let caseCreated = false;
-      if (transaction.risk_score > 70 || transaction.status === 'Flagged') {
-        console.log('🚨 High-risk transaction detected, creating case...');
-        
-        const caseData = {
-          customer_id: formData.customerId,
-          case_type: 'Transaction',
-          case_title: `High-Risk Transaction - ${formData.customerName}`,
-          description: `Transaction of ${formData.amount} ${formData.currency} flagged for review. Risk Score: ${transaction.risk_score}`,
-          risk_level: transaction.risk_score > 70 ? 'High' : 'Medium',
-          priority: transaction.risk_score > 80 ? 'High' : 'Medium',
-          status: 'Open',
-          source_transaction_id: transaction.id
-        };
-
-        const caseRecord = await caseService.createCase(caseData);
-        
-        if (caseRecord) {
-          console.log('✅ Case created:', caseRecord);
-          caseCreated = true;
-          
-          // Add case action for transaction
-          await caseService.addCaseAction(caseRecord.id, {
-            action_type: 'Transaction Flagged',
-            description: `Transaction ${transaction.id} flagged with risk score ${transaction.risk_score}`,
-            notes: `Amount: ${formData.amount} ${formData.currency}, Counterparty: ${formData.counterpartyName}`
-          });
-        }
-      }
-
-      // Show appropriate success message
-      if (caseCreated) {
-        toast.success(`Transaction added successfully! Risk score: ${transaction.risk_score}. Case created for review.`);
-      } else if (transaction.risk_score > 50) {
-        toast.success(`Transaction added successfully! Risk score: ${transaction.risk_score}. Transaction flagged for monitoring.`);
-      } else {
-        toast.success(`Transaction added successfully! Risk score: ${transaction.risk_score}.`);
-      }
+      
+      console.log('✅ Transaction created successfully:', transaction);
+      
+      // Show success message
+      toast.success('Transaction created successfully!');
       
       // Reset form
-      setFormData({
+      const resetFormData = {
         customerName: "",
         customerId: "",
-        transactionDate: "",
-        amount: "",
-        currency: "",
-        transactionType: "",
-        country: "",
-        counterpartyName: "",
+        customerType: "",
+        directorId: "",
+        directorName: "",
+        descriptionOfReport: "",
+        actionTakenByReportingEntity: "",
+        date: "",
+        internalReferenceNumber: "",
+        transactionProduct: "",
+        paymentMode: "",
+        channel: "",
         sourceOfFunds: "",
-        purpose: "",
-        description: ""
-      });
-      setCustomerSearch("");
+        transactionPurpose: "",
+        currency: "",
+        rate: "",
+        invoiceAmount: "",
+        itemType: "",
+        statusCode: "",
+        reason: "",
+        description: "",
+        beneficiaryName: "",
+        beneficiaryComments: "",
+        lateDeposit: "",
+        branch: "",
+        indemnifiedForRepatriation: "",
+        executedBy: "",
+        amountLc: "",
+        estimatedAmount: "",
+        itemSize: "",
+        itemUnit: "",
+        statusComments: "",
+        carrierName: "",
+        carrierDetails: "",
+        isStrIstr: false
+      };
+      setFormData(resetFormData);
+      setSelectedCustomer(null);
+      setDirectors([]);
       setErrors({});
       setTouched({});
       
@@ -344,6 +472,92 @@ const AddTransaction = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Helper function to render form field
+  const renderField = (name, label, type = "text", options = null, required = false, placeholder = "") => {
+    const isError = touched[name] && errors[name];
+    
+    // Special handling for checkbox - no top label, but align with textbox
+    if (type === "checkbox") {
+      const checkboxId = `checkbox-${name}`;
+      return (
+        <div>
+          {/* Empty space to match label height + margin (mb-2) */}
+          <div className="h-7 mb-2"></div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id={checkboxId}
+              name={name}
+              checked={formData[name]}
+              onChange={handleInputChange}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+            />
+            <label 
+              htmlFor={checkboxId}
+              className="ml-2 text-sm font-medium text-gray-700 cursor-pointer"
+            >
+              {label} {required && <span className="text-red-500">*</span>}
+            </label>
+          </div>
+          {isError && (
+            <p className="text-red-500 text-xs mt-1">{errors[name]}</p>
+          )}
+        </div>
+      );
+    }
+    
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        {type === "select" ? (
+          <select
+            name={name}
+            value={formData[name]}
+            onChange={handleInputChange}
+            onBlur={handleFieldBlur}
+            className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              isError ? 'border-red-500' : 'border-gray-300'
+            }`}
+          >
+            <option value="">Select {label}</option>
+            {options && options.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        ) : type === "textarea" ? (
+          <textarea
+            name={name}
+            value={formData[name]}
+            onChange={handleInputChange}
+            onBlur={handleFieldBlur}
+            rows={3}
+            placeholder={placeholder}
+            className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              isError ? 'border-red-500' : 'border-gray-300'
+            }`}
+          />
+        ) : (
+          <input
+            type={type}
+            name={name}
+            value={formData[name]}
+            onChange={handleInputChange}
+            onBlur={handleFieldBlur}
+            placeholder={placeholder}
+            className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              isError ? 'border-red-500' : 'border-gray-300'
+            }`}
+          />
+        )}
+        {isError && (
+          <p className="text-red-500 text-xs mt-1">{errors[name]}</p>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -374,105 +588,151 @@ const AddTransaction = () => {
       {/* Manual Entry Tab */}
       {tab === "manual" && (
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Row 1, Column 1: Customer Name/ID */}
           <div className="relative" ref={customerDropdownRef}>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Customer Name / ID *
+              Customer Name / ID <span className="text-red-500">*</span>
             </label>
-            <input 
-              type="text" 
-              name="customerName"
-              value={customerSearch}
-              onChange={handleCustomerSearchChange}
-              onBlur={handleFieldBlur}
-              placeholder="Start typing customer name or ID..."
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.customerName && errors.customerName ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {isSearchingCustomers && (
-              <div className="absolute right-3 top-8">
+            {loadingCustomers ? (
+              <div className="flex items-center space-x-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span className="text-sm text-gray-600">Loading customers...</span>
               </div>
-            )}
-            
-            {/* Customer Dropdown */}
-            {showCustomerDropdown && customerResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                {customerResults.map((customer) => (
-                  <div
-                    key={customer.id}
-                    onClick={() => handleCustomerSelect(customer)}
-                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+            ) : (
+              <>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="customerName"
+                    value={customerInputValue}
+                    onChange={handleCustomerInputChange}
+                    onFocus={() => {
+                      if (allCustomers.length === 0) {
+                        loadAllCustomers();
+                      }
+                      setShowCustomerDropdown(true);
+                    }}
+                    onBlur={handleFieldBlur}
+                    placeholder="Type to search customers..."
+                    className={`w-full border rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      touched.customerName && errors.customerName ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                  <svg
+                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 transition-transform pointer-events-none ${
+                      showCustomerDropdown ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <div className="font-medium">
-                      {customer.first_name} {customer.last_name}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      ID: {customer.id} • {customer.email}
-                    </div>
-                    {customer.risk_level && (
-                      <div className={`text-xs px-2 py-1 rounded-full inline-block mt-1 ${
-                        customer.risk_level === 'High' ? 'bg-red-100 text-red-800' :
-                        customer.risk_level === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {customer.risk_level} Risk
-                      </div>
-                    )}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                
+                {/* Dropdown List */}
+                {showCustomerDropdown && filteredCustomers.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                    {filteredCustomers.map((customer) => {
+                      const displayName = getCustomerDisplayName(customer);
+                      const customerType = customer.customer_type || customer.customerType || '';
+                      
+                      return (
+                        <div
+                          key={customer.id}
+                          onClick={() => handleCustomerSelect(customer)}
+                          className={`px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                            formData.customerId === customer.id ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <div className="font-medium text-gray-900">{displayName}</div>
+                          <div className="text-sm text-gray-600">
+                            {customerType} • ID: {customer.id.substring(0, 8)}...
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
+                )}
+                
+                {showCustomerDropdown && filteredCustomers.length === 0 && customerInputValue.trim() && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg px-4 py-8 text-center text-gray-500">
+                    No customers found
+                  </div>
+                )}
+              </>
             )}
-            
             {touched.customerName && errors.customerName && (
               <p className="text-red-500 text-xs mt-1">{errors.customerName}</p>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Transaction Date *
-            </label>
-            <input 
-              type="date" 
-              name="transactionDate"
-              value={formData.transactionDate}
-              onChange={handleInputChange}
-              onBlur={handleFieldBlur}
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.transactionDate && errors.transactionDate ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {touched.transactionDate && errors.transactionDate && (
-              <p className="text-red-500 text-xs mt-1">{errors.transactionDate}</p>
-            )}
-          </div>
+          {/* Row 1, Column 2: Director/Representative - only show for Legal Entities, empty by default */}
+          {formData.customerType === 'Legal Entities' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Director/Representative <span className="text-red-500">*</span>
+              </label>
+              {loadingDirectors ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-sm text-gray-600">Loading directors...</span>
+                </div>
+              ) : (
+                <select 
+                  name="directorId"
+                  value={formData.directorId}
+                  onChange={(e) => {
+                    const selectedDirector = directors.find(d => d.id === e.target.value);
+                    handleInputChange(e);
+                    setFormData(prev => ({
+                      ...prev,
+                      directorName: selectedDirector 
+                        ? `${selectedDirector.firstName || ''} ${selectedDirector.lastName || ''}`.trim() || selectedDirector.alias || 'Director'
+                        : ""
+                    }));
+                  }}
+                  onBlur={handleFieldBlur}
+                  className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    touched.directorId && errors.directorId ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Select Director/Representative</option>
+                  {directors.map((director) => {
+                    const directorName = director.firstName && director.lastName
+                      ? `${director.firstName} ${director.lastName}`
+                      : director.alias || 'Director';
+                    const role = director.isRepresentative ? ' (Representative)' : director.isCeo ? ' (CEO)' : '';
+                    return (
+                      <option key={director.id} value={director.id}>
+                        {directorName}{role}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+              {touched.directorId && errors.directorId && (
+                <p className="text-red-500 text-xs mt-1">{errors.directorId}</p>
+              )}
+            </div>
+          ) : (
+            <div></div>
+          )}
 
+          {renderField("descriptionOfReport", "Description of the Report", "textarea", null, true, "Enter description of the report")}
+          {renderField("actionTakenByReportingEntity", "Action taken by reporting entity", "textarea", null, true, "Enter action taken")}
+          {renderField("date", "Date", "date", null, true)}
+          {renderField("internalReferenceNumber", "Internal reference number", "text", null, true, "Enter internal reference number")}
+          {renderField("transactionProduct", "Transaction product", "select", transactionProducts, true)}
+          {renderField("paymentMode", "Payment Mode", "select", paymentModes, true)}
+          {renderField("channel", "Channel", "select", channelOptions, true)}
+          {renderField("sourceOfFunds", "Source of funds", "select", sourceOfFunds, true)}
+          {renderField("transactionPurpose", "Transaction purpose", "select", transactionPurposes, true)}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Amount *
+              Currency <span className="text-red-500">*</span>
             </label>
-            <input 
-              type="number" 
-              step="0.01"
-              name="amount"
-              value={formData.amount}
-              onChange={handleInputChange}
-              onBlur={handleFieldBlur}
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.amount && errors.amount ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {touched.amount && errors.amount && (
-              <p className="text-red-500 text-xs mt-1">{errors.amount}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Currency *
-            </label>
-            <select 
+            <select
               name="currency"
               value={formData.currency}
               onChange={handleInputChange}
@@ -482,142 +742,38 @@ const AddTransaction = () => {
               }`}
             >
               <option value="">Select Currency</option>
-              {currencies.map((currency) => (
-                <option key={currency.code} value={currency.code}>{currency.name}</option>
+              {[...currencies].sort((a, b) => a.name.localeCompare(b.name)).map((currency) => ( 
+                <option key={currency.code} value={currency.code}>
+                  {currency.name} ({currency.code})
+                </option>
               ))}
             </select>
             {touched.currency && errors.currency && (
               <p className="text-red-500 text-xs mt-1">{errors.currency}</p>
             )}
           </div>
+          {renderField("rate", "Rate", "number", null, true, "0.00")}
+          {renderField("invoiceAmount", "Invoice amount", "number", null, true, "0.00")}
+          {renderField("itemType", "Item type", "select", itemTypes, true)}
+          {renderField("statusCode", "Status code", "select", statusCodes, true)}
+          {renderField("beneficiaryName", "Beneficiary name", "text", null, false, "Enter beneficiary name")}
+          {renderField("beneficiaryComments", "Beneficiary comments", "textarea", null, false, "Enter beneficiary comments")}
+          {renderField("lateDeposit", "Late deposit", "select", yesNoOptions, false)}
+          {renderField("branch", "Branch", "text", null, false, "Enter branch")}
+          {renderField("indemnifiedForRepatriation", "Indemnified for repatriation", "select", yesNoOptions, false)}
+          {renderField("executedBy", "Executed by", "select", executedByOptions, false)}
+          {renderField("amountLc", "Amount LC", "number", null, false, "0.00")}
+          {renderField("estimatedAmount", "Estimated amount", "number", null, false, "0.00")}
+          {renderField("itemSize", "Item size", "text", null, false, "Enter item size")}
+          {renderField("itemUnit", "Item unit", "text", null, false, "Enter item unit")}
+          {renderField("statusComments", "Status comments", "textarea", null, false, "Enter status comments")}
+          {renderField("carrierName", "Carrier name", "text", null, false, "Enter carrier name")}
+          {renderField("carrierDetails", "Carrier details", "textarea", null, false, "Enter carrier details")}
+          {renderField("isStrIstr", "Is STR/ISTR", "checkbox", null, false)}
+          {renderField("reason", "Reason", "textarea", null, true, "Enter reason")}
+          {renderField("description", "Description", "textarea", null, true, "Enter description")}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Transaction Type *
-            </label>
-            <select 
-              name="transactionType"
-              value={formData.transactionType}
-              onChange={handleInputChange}
-              onBlur={handleFieldBlur}
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.transactionType && errors.transactionType ? 'border-red-500' : 'border-gray-300'
-              }`}
-            >
-              <option value="">Select Type</option>
-              <option value="credit">Credit</option>
-              <option value="debit">Debit</option>
-              <option value="Cash">Cash</option>
-            </select>
-            {touched.transactionType && errors.transactionType && (
-              <p className="text-red-500 text-xs mt-1">{errors.transactionType}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Country *
-            </label>
-            <select 
-              name="country"
-              value={formData.country}
-              onChange={handleInputChange}
-              onBlur={handleFieldBlur}
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.country && errors.country ? 'border-red-500' : 'border-gray-300'
-              }`}
-            >
-              <option value="">Select Country</option>
-              {countries.map((country) => (
-                <option key={country.code} value={country.code}>{country.name}</option>
-              ))}
-            </select>
-            {touched.country && errors.country && (
-              <p className="text-red-500 text-xs mt-1">{errors.country}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Counterparty Name *
-            </label>
-            <input 
-              type="text" 
-              name="counterpartyName"
-              value={formData.counterpartyName}
-              onChange={handleInputChange}
-              onBlur={handleFieldBlur}
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.counterpartyName && errors.counterpartyName ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {touched.counterpartyName && errors.counterpartyName && (
-              <p className="text-red-500 text-xs mt-1">{errors.counterpartyName}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Source of Funds *
-            </label>
-            <select 
-              name="sourceOfFunds"
-              value={formData.sourceOfFunds}
-              onChange={handleInputChange}
-              onBlur={handleFieldBlur}
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.sourceOfFunds && errors.sourceOfFunds ? 'border-red-500' : 'border-gray-300'
-              }`}
-            >
-              <option value="">Select Source</option>
-              {sourceOfFunds.map((source) => (
-                <option key={source} value={source}>{source}</option>
-              ))}
-            </select>
-            {touched.sourceOfFunds && errors.sourceOfFunds && (
-              <p className="text-red-500 text-xs mt-1">{errors.sourceOfFunds}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Purpose of Transaction *
-            </label>
-            <input 
-              type="text" 
-              name="purpose"
-              value={formData.purpose}
-              onChange={handleInputChange}
-              onBlur={handleFieldBlur}
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.purpose && errors.purpose ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {touched.purpose && errors.purpose && (
-              <p className="text-red-500 text-xs mt-1">{errors.purpose}</p>
-            )}
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description / Notes
-            </label>
-            <textarea 
-              rows="4"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              onBlur={handleFieldBlur}
-              className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                touched.description && errors.description ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {touched.description && errors.description && (
-              <p className="text-red-500 text-xs mt-1">{errors.description}</p>
-            )}
-          </div>
-
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 flex justify-end">
             <button 
               type="submit"
               disabled={isSubmitting}
@@ -627,7 +783,7 @@ const AddTransaction = () => {
                   : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
             >
-              {isSubmitting ? 'Adding Transaction...' : 'Submit Transaction'}
+              {isSubmitting ? 'Submitting...' : 'Submit Transaction'}
             </button>
           </div>
         </form>
@@ -662,8 +818,3 @@ const AddTransaction = () => {
 };
 
 export default AddTransaction;
-
-// Tailwind helper styles (can be added globally or scoped)
-// .input { @apply border p-2 rounded w-full; }
-// .btn-primary { @apply bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700; }
-// .btn-disabled { @apply bg-gray-300 text-gray-600 px-4 py-2 rounded cursor-not-allowed; }

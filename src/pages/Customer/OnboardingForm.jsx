@@ -81,7 +81,7 @@ const OnboardingForm = ({
         poBox: initialData.pobox || "",
         gender: initialData.gender || "",
         employer: initialData.employer || "",
-        dualNationality: initialData.dualinationality || "",
+        dualNationality: initialData.dualnationality || "",
         dualPassportNumber: initialData.dualpassportnumber || "",
         dualPassportIssueDate: initialData.dualpassportissuedate || "",
         dualPassportExpiryDate: initialData.dualpassportexpirydate || "",

@@ -169,7 +169,6 @@ export const currencies = [
   { code: "TOP", name: "Tongan Pa'anga", symbol: "T$" },
   { code: "KID", name: "Kiribati Dollar", symbol: "$" },
   { code: "TVD", name: "Tuvaluan Dollar", symbol: "$" },
-  { code: "XPF", name: "CFP Franc", symbol: "₣" },
 
   // Precious Metals
   { code: "XAU", name: "Gold Ounce", symbol: "XAU" },

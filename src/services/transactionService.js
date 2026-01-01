@@ -66,19 +66,47 @@ export const transactionService = {
         const status = riskScore > 50 ? 'Flagged' : 'Normal'
         console.log('📊 Transaction status:', status)
         
-        // Create mock transaction data
+        // Create mock transaction data with all fields
         const mockTransaction = {
           id: 'mock-transaction-' + Date.now(),
           customer_id: transactionData.customer_id,
-          transaction_type: transactionData.transaction_type,
-          amount: transactionData.amount,
+          director_id: transactionData.director_id || null,
+          transaction_type: transactionData.transaction_type || transactionData.payment_mode || null,
+          amount: transactionData.amount || transactionData.invoice_amount || 0,
           currency: transactionData.currency,
-          transaction_date: transactionData.transaction_date,
-          source_account: transactionData.source_account,
-          destination_account: transactionData.destination_account,
-          description: transactionData.description,
+          transaction_date: transactionData.transaction_date || new Date().toISOString(),
+          source_account: transactionData.source_account || null,
+          destination_account: transactionData.destination_account || null,
+          description: transactionData.description || null,
+          description_of_report: transactionData.description_of_report || null,
+          action_taken_by_reporting_entity: transactionData.action_taken_by_reporting_entity || null,
+          internal_reference_number: transactionData.internal_reference_number || null,
+          transaction_product: transactionData.transaction_product || null,
+          payment_mode: transactionData.payment_mode || null,
+          channel: transactionData.channel || null,
+          source_of_funds: transactionData.source_of_funds || null,
+          transaction_purpose: transactionData.transaction_purpose || null,
+          rate: transactionData.rate || null,
+          invoice_amount: transactionData.invoice_amount || null,
+          item_type: transactionData.item_type || null,
+          status_code: transactionData.status_code || null,
+          reason: transactionData.reason || null,
+          beneficiary_name: transactionData.beneficiary_name || null,
+          beneficiary_comments: transactionData.beneficiary_comments || null,
+          late_deposit: transactionData.late_deposit || null,
+          branch: transactionData.branch || null,
+          indemnified_for_repatriation: transactionData.indemnified_for_repatriation || null,
+          executed_by: transactionData.executed_by || null,
+          amount_lc: transactionData.amount_lc || null,
+          estimated_amount: transactionData.estimated_amount || null,
+          item_size: transactionData.item_size || null,
+          item_unit: transactionData.item_unit || null,
+          status_comments: transactionData.status_comments || null,
+          carrier_name: transactionData.carrier_name || null,
+          carrier_details: transactionData.carrier_details || null,
+          is_str_istr: transactionData.is_str_istr || false,
           risk_score: riskScore,
-          status: status,
+          status: 'Pending', // All new transactions are pending approval
           created_by: 'mock-user-id',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -116,28 +144,51 @@ export const transactionService = {
       
       const user = await getCurrentUser()
       
-      // Calculate risk score
-      const riskScore = calculateTransactionRisk(transactionData)
-      const status = riskScore > 50 ? 'Flagged' : 'Normal'
-      
-      // Extract only the columns that exist in the transactions table
+      // Extract risk_assessment_data if it exists (for backward compatibility)
       const { risk_assessment_data, ...dbTransactionData } = transactionData
       
-      // Create payload with only the exact columns that exist in the transactions table
+      // Create payload with all transaction fields - direct mapping from form data
       const transactionPayload = {
         customer_id: dbTransactionData.customer_id,
-        transaction_type: dbTransactionData.transaction_type,
-        amount: dbTransactionData.amount,
+        director_id: dbTransactionData.director_id || null,
+        transaction_type: dbTransactionData.transaction_type || null,
+        amount: dbTransactionData.amount || 0,
         currency: dbTransactionData.currency,
-        transaction_date: dbTransactionData.transaction_date,
-        source_account: dbTransactionData.source_account,
-        destination_account: dbTransactionData.destination_account,
-        description: dbTransactionData.description,
-        risk_score: riskScore,
-        status: status,
+        transaction_date: dbTransactionData.transaction_date || new Date().toISOString(),
+        source_account: dbTransactionData.source_account || null,
+        destination_account: dbTransactionData.destination_account || null,
+        description_of_report: dbTransactionData.description_of_report || null,
+        action_taken_by_reporting_entity: dbTransactionData.action_taken_by_reporting_entity || null,
+        internal_reference_number: dbTransactionData.internal_reference_number || null,
+        transaction_product: dbTransactionData.transaction_product || null,
+        payment_mode: dbTransactionData.payment_mode || null,
+        channel: dbTransactionData.channel || null,
+        source_of_funds: dbTransactionData.source_of_funds || null,
+        transaction_purpose: dbTransactionData.transaction_purpose || null,
+        rate: dbTransactionData.rate ? parseFloat(dbTransactionData.rate) : null,
+        invoice_amount: dbTransactionData.invoice_amount ? parseFloat(dbTransactionData.invoice_amount) : null,
+        amount_lc: dbTransactionData.amount_lc ? parseFloat(dbTransactionData.amount_lc) : null,
+        estimated_amount: dbTransactionData.estimated_amount ? parseFloat(dbTransactionData.estimated_amount) : null,
+        item_type: dbTransactionData.item_type || null,
+        item_size: dbTransactionData.item_size || null,
+        item_unit: dbTransactionData.item_unit || null,
+        status_code: dbTransactionData.status_code || null,
+        status_comments: dbTransactionData.status_comments || null,
+        beneficiary_name: dbTransactionData.beneficiary_name || null,
+        beneficiary_comments: dbTransactionData.beneficiary_comments || null,
+        late_deposit: dbTransactionData.late_deposit || null,
+        branch: dbTransactionData.branch || null,
+        indemnified_for_repatriation: dbTransactionData.indemnified_for_repatriation || null,
+        executed_by: dbTransactionData.executed_by || null,
+        carrier_name: dbTransactionData.carrier_name || null,
+        carrier_details: dbTransactionData.carrier_details || null,
+        is_str_istr: dbTransactionData.is_str_istr || false,
+        reason: dbTransactionData.reason || null,
+        description: dbTransactionData.description || null,
+        risk_score: 0, // Default to 0, risk calculation will be added later
+        status: 'Pending', // Default status - pending approval
         created_by: user.id,
         created_at: new Date().toISOString()
-        // Note: transactions table doesn't have updated_by column
       }
       
       console.log('📊 Transaction payload being sent to database:', transactionPayload)
@@ -155,33 +206,6 @@ export const transactionService = {
       }
       
       console.log('📊 Real transaction created:', transaction)
-      console.log('📊 Real transaction risk score:', transaction.risk_score)
-      console.log('📊 Real transaction status:', transaction.status)
-      
-      // Create alert if transaction is flagged
-      if (status === 'Flagged') {
-        console.log('🚨 Creating alert for flagged transaction...')
-        const alertData = {
-          transaction_id: transaction.id,
-          alert_type: 'High Risk Transaction',
-          severity: riskScore >= 80 ? 'Critical' : riskScore >= 60 ? 'High' : 'Medium',
-          description: `Transaction flagged with risk score ${riskScore}. Amount: ${transactionData.currency} ${parseFloat(transactionData.amount).toLocaleString()}`,
-          status: 'Open',
-          created_at: new Date().toISOString()
-        }
-        
-        const { data: alert, error: alertError } = await supabase
-          .from('transaction_alerts')
-          .insert(alertData)
-          .select()
-          .single()
-        
-        if (alertError) {
-          console.error('❌ Error creating alert:', alertError)
-        } else {
-          console.log('✅ Alert created successfully:', alert)
-        }
-      }
       
       return transaction
     } catch (error) {
@@ -236,29 +260,85 @@ export const transactionService = {
       
       console.log('🔗 Fetching transactions from real Supabase database...')
       
+      // If search filter is provided, first find matching customer IDs
+      let customerIds = null;
+      if (filters.search) {
+        const searchTerm = filters.search.toLowerCase();
+        // Search in customers table (email) and detail tables (names)
+        const customerIdsSet = new Set();
+        
+        // Search by email in customers table
+        const { data: customersByEmail, error: emailError } = await supabase
+          .from('customers')
+          .select('id')
+          .ilike('email', `%${filters.search}%`)
+        
+        if (!emailError && customersByEmail) {
+          customersByEmail.forEach(c => customerIdsSet.add(c.id));
+        }
+        
+        // Search in natural_person_details
+        const { data: npDetails, error: npError } = await supabase
+          .from('natural_person_details')
+          .select('customer_id')
+          .or(`firstname.ilike.%${filters.search}%,lastname.ilike.%${filters.search}%`)
+        
+        if (!npError && npDetails) {
+          npDetails.forEach(d => customerIdsSet.add(d.customer_id));
+        }
+        
+        // Search in legal_entity_details
+        const { data: leDetails, error: leError } = await supabase
+          .from('legal_entity_details')
+          .select('customer_id')
+          .or(`legalname.ilike.%${filters.search}%,alias.ilike.%${filters.search}%`)
+        
+        if (!leError && leDetails) {
+          leDetails.forEach(d => customerIdsSet.add(d.customer_id));
+        }
+        
+        if (customerIdsSet.size > 0) {
+          customerIds = Array.from(customerIdsSet);
+        } else {
+          // No matching customers found, return empty result
+          return {
+            success: true,
+            data: [],
+            count: 0
+          };
+        }
+      }
+      
       let query = supabase
         .from('transactions')
         .select(`
           *,
           customers (
             id,
-            first_name,
-            last_name,
-            email
+            email,
+            customer_type,
+            natural_person_details (
+              firstname,
+              lastname
+            ),
+            legal_entity_details (
+              legalname,
+              alias
+            )
           )
         `)
       
       // Add filters
-      if (filters.search) {
-        query = query.or(`customers.first_name.ilike.%${filters.search}%,customers.last_name.ilike.%${filters.search}%`)
+      if (customerIds) {
+        query = query.in('customer_id', customerIds);
       }
       
-      if (filters.date_from) {
-        query = query.gte('transaction_date', filters.date_from)
+      if (filters.dateFrom) {
+        query = query.gte('transaction_date', filters.dateFrom)
       }
       
-      if (filters.date_to) {
-        query = query.lte('transaction_date', filters.date_to)
+      if (filters.dateTo) {
+        query = query.lte('transaction_date', filters.dateTo)
       }
       
       if (filters.status) {
@@ -269,15 +349,38 @@ export const transactionService = {
         query = query.gte('risk_score', filters.risk_score)
       }
       
+      // Get total count before pagination (with same filters)
+      let countQuery = supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+      
+      if (customerIds) {
+        countQuery = countQuery.in('customer_id', customerIds);
+      }
+      if (filters.dateFrom) {
+        countQuery = countQuery.gte('transaction_date', filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        countQuery = countQuery.lte('transaction_date', filters.dateTo);
+      }
+      if (filters.status) {
+        countQuery = countQuery.eq('status', filters.status);
+      }
+      if (filters.risk_score) {
+        countQuery = countQuery.gte('risk_score', filters.risk_score);
+      }
+      
+      const { count: totalCount } = await countQuery;
+      
+      // Add ordering
+      query = query.order('created_at', { ascending: false })
+      
       // Add pagination
       const from = (page - 1) * limit
       const to = from + limit - 1
       query = query.range(from, to)
       
-      // Add ordering
-      query = query.order('created_at', { ascending: false })
-      
-      const { data: transactions, error, count } = await query
+      const { data: transactions, error } = await query
       
       if (error) {
         console.error('Supabase query error:', error)
@@ -290,7 +393,7 @@ export const transactionService = {
       return { 
         success: true,
         data: transactions || [], 
-        count: count || 0
+        count: totalCount || 0
       }
     } catch (error) {
       console.error('Error fetching transactions:', error)
@@ -344,8 +447,19 @@ export const transactionService = {
         .from('transactions')
         .select(`
           *,
-          customers (*),
-          transaction_alerts (*)
+          customers (
+            id,
+            email,
+            customer_type,
+            natural_person_details (
+              firstname,
+              lastname
+            ),
+            legal_entity_details (
+              legalname,
+              alias
+            )
+          )
         `)
         .eq('id', id)
         .single()
@@ -439,6 +553,69 @@ export const transactionService = {
       return await dbHelpers.update('transactions', id, updatePayload)
     } catch (error) {
       handleSupabaseError(error)
+    }
+  },
+
+  // Approve transaction
+  approveTransaction: async (id) => {
+    try {
+      const user = await getCurrentUser()
+      
+      const updatePayload = {
+        status: 'Approved',
+        approved_by: user.id,
+        approved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      const { data: transaction, error } = await supabase
+        .from('transactions')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('Error approving transaction:', error)
+        throw new Error(error.message || 'Failed to approve transaction')
+      }
+      
+      return transaction
+    } catch (error) {
+      console.error('Error approving transaction:', error)
+      throw new Error(error.message || 'Failed to approve transaction')
+    }
+  },
+
+  // Reject transaction
+  rejectTransaction: async (id, reason = '') => {
+    try {
+      const user = await getCurrentUser()
+      
+      const updatePayload = {
+        status: 'Rejected',
+        rejection_reason: reason,
+        approved_by: user.id, // Using approved_by to track who rejected it
+        approved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      const { data: transaction, error } = await supabase
+        .from('transactions')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('Error rejecting transaction:', error)
+        throw new Error(error.message || 'Failed to reject transaction')
+      }
+      
+      return transaction
+    } catch (error) {
+      console.error('Error rejecting transaction:', error)
+      throw new Error(error.message || 'Failed to reject transaction')
     }
   },
 

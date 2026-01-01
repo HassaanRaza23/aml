@@ -547,8 +547,8 @@ const RiskProfile = () => {
       <p className="text-gray-600 mb-6">
         Customer: <span className="font-medium">
           {customerData.customer_type === 'Natural Person' 
-            ? `${customerData.first_name || ''} ${customerData.last_name || ''}`.trim()
-            : customerData.first_name || customerData.alias || 'Legal Entity'
+            ? `${customerData.natural_person_details?.firstname || ''} ${customerData.natural_person_details?.lastname || ''}`.trim() || 'Natural Person'
+            : customerData.legal_entity_details?.legalname || customerData.legal_entity_details?.alias || customerData.alias || 'Legal Entity'
           }
         </span>
       </p>

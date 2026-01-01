@@ -26,12 +26,12 @@ const menu = [
     ],
   },
   {
-    title: 'Monitoring',
+    title: 'Transactions',
     subMenu: [
-      { title: 'Add Transactions', path: '/monitoring/addtransactions' },
-      { title: 'Transaction Monitoring', path: '/monitoring/transactions' },
-      { title: 'Alerts', path: '/monitoring/alerts' },
-      { title: 'Transaction Rules', path: '/monitoring/transactionrules' },
+      { title: 'Add Transactions', path: '/transactions/addtransactions' },
+      { title: 'Transaction Approvals', path: '/transactions/approvals' },
+      { title: 'Reports', path: '/transactions/reports' },
+      // { title: 'Transaction Rules', path: '/transactions/transactionrules' },
     ],
   },
   {
