@@ -31,6 +31,7 @@ const menu = [
       { title: 'Add Transactions', path: '/transactions/addtransactions' },
       { title: 'Transaction Approvals', path: '/transactions/approvals' },
       { title: 'Reports', path: '/transactions/reports' },
+      { title: 'XML Report Format', path: '/transactions/xml-report' },
       // { title: 'Transaction Rules', path: '/transactions/transactionrules' },
     ],
   },

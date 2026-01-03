@@ -31,6 +31,7 @@ import CaseDetailView from './pages/Screening/CaseDetailView';
 import AddTransaction from './pages/Monitoring/AddTransaction';
 import TransactionApprovals from './pages/Monitoring/TransactionApprovals';
 import TransactionReports from './pages/Monitoring/TransactionReports';
+import TransactionXMLReport from './pages/Monitoring/TransactionXMLReport';
 import TransactionRules from './pages/Monitoring/TransactionRules';
 
 // Risk
@@ -97,6 +98,7 @@ const App = () => {
                 <Route path="transactions/addtransactions" element={<AddTransaction />} />
                 <Route path="transactions/approvals" element={<TransactionApprovals />} />
                 <Route path="transactions/reports" element={<TransactionReports />} />
+                <Route path="transactions/xml-report" element={<TransactionXMLReport />} />
                 <Route path="transactions/transactionrules" element={<TransactionRules />} />
 
                 {/* Risk */}

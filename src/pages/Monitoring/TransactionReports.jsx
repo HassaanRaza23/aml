@@ -23,6 +23,7 @@ const TransactionReports = () => {
     dateFrom: "",
     dateTo: "",
     status: "",
+    xmlGenerated: "", // "yes", "no", or "" for all
     page: 1,
     limit: 100
   });
@@ -102,6 +103,7 @@ const TransactionReports = () => {
       dateFrom: "",
       dateTo: "",
       status: "",
+      xmlGenerated: "",
       page: 1,
       limit: 100
     });
@@ -144,12 +146,10 @@ const TransactionReports = () => {
   // Get status counts
   const getStatusCounts = () => {
     const counts = {
+      Total: transactions.length,
       Pending: 0,
       Approved: 0,
-      Rejected: 0,
-      Normal: 0,
-      Flagged: 0,
-      Blocked: 0
+      Rejected: 0
     };
     
     transactions.forEach(tx => {
@@ -157,9 +157,6 @@ const TransactionReports = () => {
       if (status === 'pending') counts.Pending++;
       else if (status === 'approved') counts.Approved++;
       else if (status === 'rejected') counts.Rejected++;
-      else if (status === 'normal') counts.Normal++;
-      else if (status === 'flagged') counts.Flagged++;
-      else if (status === 'blocked') counts.Blocked++;
     });
     
     return counts;
@@ -173,9 +170,6 @@ const TransactionReports = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Transaction Reports</h1>
-          <p className="text-gray-600 mt-1">
-            {totalCount} transaction{totalCount !== 1 ? 's' : ''} total
-          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -197,7 +191,11 @@ const TransactionReports = () => {
 
       {/* Status Summary Cards */}
       {!loading && !error && transactions.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="text-sm text-blue-600 font-medium">Total</div>
+            <div className="text-2xl font-bold text-blue-800">{statusCounts.Total}</div>
+          </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div className="text-sm text-yellow-600 font-medium">Pending</div>
             <div className="text-2xl font-bold text-yellow-800">{statusCounts.Pending}</div>
@@ -209,18 +207,6 @@ const TransactionReports = () => {
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="text-sm text-red-600 font-medium">Rejected</div>
             <div className="text-2xl font-bold text-red-800">{statusCounts.Rejected}</div>
-          </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="text-sm text-blue-600 font-medium">Normal</div>
-            <div className="text-2xl font-bold text-blue-800">{statusCounts.Normal}</div>
-          </div>
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="text-sm text-orange-600 font-medium">Flagged</div>
-            <div className="text-2xl font-bold text-orange-800">{statusCounts.Flagged}</div>
-          </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 font-medium">Blocked</div>
-            <div className="text-2xl font-bold text-gray-800">{statusCounts.Blocked}</div>
           </div>
         </div>
       )}
@@ -333,6 +319,21 @@ const TransactionReports = () => {
                 <option value="Blocked">Blocked</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                XML Generated
+              </label>
+              <select
+                value={filters.xmlGenerated}
+                onChange={(e) => handleFilterChange('xmlGenerated', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
           </div>
 
           <div className="px-5 py-4 border-t border-gray-200 flex gap-2">
@@ -391,12 +392,13 @@ const TransactionReports = () => {
                 <th className="p-4 font-medium">Transaction Product</th>
                 <th className="p-4 font-medium">Purpose</th>
                 <th className="p-4 font-medium">Status</th>
+                <th className="p-4 font-medium">XML Generated</th>
               </tr>
             </thead>
             <tbody>
               {transactions.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="p-12 text-center">
+                  <td colSpan="10" className="p-12 text-center">
                     <div className="text-gray-400 mb-4">
                       <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -439,6 +441,40 @@ const TransactionReports = () => {
                         }`}>
                           {tx.status || 'N/A'}
                         </span>
+                      </td>
+                      <td className="p-4">
+                        {(tx.status || '').toLowerCase() === 'approved' ? (
+                          <div className="flex flex-col gap-1">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              tx.xml_generated_at 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {tx.xml_generated_at ? (
+                                <>
+                                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                  Yes
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                  </svg>
+                                  No
+                                </>
+                              )}
+                            </span>
+                            {tx.xml_generated_at && (
+                              <span className="text-xs text-gray-500" title={new Date(tx.xml_generated_at).toLocaleString()}>
+                                {new Date(tx.xml_generated_at).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">N/A</span>
+                        )}
                       </td>
                     </tr>
                   );

@@ -1,53 +1,6 @@
 import { supabase, handleSupabaseError, getCurrentUser, dbHelpers } from '../config/supabase'
-import { transactionRules } from '../data/transactionRules'
-
-// Calculate transaction risk score using file-based rules
-const calculateTransactionRisk = (transactionData) => {
-  console.log('🔍 Calculating risk score for transaction data:', transactionData)
-  
-  // Extract risk assessment data if it exists
-  const riskData = transactionData.risk_assessment_data || {}
-  
-  // Create a flattened data object for rule evaluation
-  const ruleData = {
-    ...transactionData,
-    destination_country: riskData.destination_country,
-    source_of_funds: riskData.source_of_funds,
-    purpose: riskData.purpose,
-    is_unusual_pattern: riskData.is_unusual_pattern,
-    involves_third_party: riskData.involves_third_party,
-    is_structuring: riskData.is_structuring,
-    involves_pep: riskData.involves_pep,
-    involves_sanctioned_entity: riskData.involves_sanctioned_entity,
-    frequency: riskData.frequency
-  }
-  
-  console.log('🔍 Key fields for rules:')
-  console.log('  - amount:', ruleData.amount, '(type:', typeof ruleData.amount, ')')
-  console.log('  - transaction_type:', ruleData.transaction_type)
-  console.log('  - destination_country:', ruleData.destination_country)
-  console.log('  - involves_third_party:', ruleData.involves_third_party)
-  
-  let score = 0
-  const triggeredRules = []
-  
-  transactionRules.forEach(rule => {
-    const isTriggered = rule.condition(ruleData)
-    if (isTriggered) {
-      score += rule.score
-      triggeredRules.push({ name: rule.name, score: rule.score })
-      console.log(`✅ Rule triggered: ${rule.name} (+${rule.score} points)`)
-    } else {
-      console.log(`❌ Rule not triggered: ${rule.name}`)
-    }
-  })
-  
-  const finalScore = Math.min(score, 100) // Cap at 100
-  console.log(`📊 Risk calculation complete: ${score} points, capped to ${finalScore}`)
-  console.log('🎯 Triggered rules:', triggeredRules)
-  
-  return finalScore
-}
+// Note: Transaction risk calculation will be added later when requested
+// import { transactionRules } from '../data/transactionRules'
 
 export const transactionService = {
   // Create a new transaction
@@ -57,14 +10,6 @@ export const transactionService = {
       if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
         // Mock implementation for development
         console.log('🔧 Using mock transaction creation (Supabase not configured)')
-        
-        // Calculate risk score using transaction rules
-        console.log('🔍 About to calculate risk score...')
-        const riskScore = calculateTransactionRisk(transactionData)
-        console.log('📊 Calculated risk score:', riskScore)
-        
-        const status = riskScore > 50 ? 'Flagged' : 'Normal'
-        console.log('📊 Transaction status:', status)
         
         // Create mock transaction data with all fields
         const mockTransaction = {
@@ -105,7 +50,7 @@ export const transactionService = {
           carrier_name: transactionData.carrier_name || null,
           carrier_details: transactionData.carrier_details || null,
           is_str_istr: transactionData.is_str_istr || false,
-          risk_score: riskScore,
+          risk_score: 0, // Risk calculation will be added later
           status: 'Pending', // All new transactions are pending approval
           created_by: 'mock-user-id',
           created_at: new Date().toISOString(),
@@ -116,26 +61,6 @@ export const transactionService = {
         await new Promise(resolve => setTimeout(resolve, 1000))
         
         console.log('📊 Mock transaction created:', mockTransaction)
-        console.log('📊 Mock transaction risk score:', mockTransaction.risk_score)
-        console.log('📊 Mock transaction status:', mockTransaction.status)
-        
-        // Create mock alert if transaction is flagged
-        if (status === 'Flagged') {
-          console.log('🚨 Creating mock alert for flagged transaction...')
-          const mockAlert = {
-            id: 'mock-alert-' + Date.now(),
-            transaction_id: mockTransaction.id,
-            customer_id: transactionData.customer_id,
-            alert_type: 'High Risk Transaction',
-            risk_score: riskScore,
-            status: 'Open',
-            reason: `Transaction flagged with risk score ${riskScore}`,
-            notes: 'Automatically flagged by system',
-            created_by: 'mock-user-id',
-            created_at: new Date().toISOString()
-          }
-          console.log('✅ Mock alert created:', mockAlert)
-        }
         
         return mockTransaction
       }
@@ -341,12 +266,30 @@ export const transactionService = {
         query = query.lte('transaction_date', filters.dateTo)
       }
       
-      if (filters.status) {
+      // Handle status filter - support both single status and array of statuses
+      if (filters.statusFilter && Array.isArray(filters.statusFilter) && filters.statusFilter.length > 0) {
+        // Use 'or' filter for multiple statuses to ensure we get all matches
+        if (filters.statusFilter.length === 1) {
+          query = query.eq('status', filters.statusFilter[0]);
+        } else {
+          // Build or filter: status = 'Approved' OR status = 'Rejected'
+          // Supabase or syntax: "status.eq.Approved,status.eq.Rejected"
+          const orConditions = filters.statusFilter.map(status => `status.eq.${status}`).join(',');
+          query = query.or(orConditions);
+        }
+      } else if (filters.status) {
         query = query.eq('status', filters.status)
       }
       
       if (filters.risk_score) {
         query = query.gte('risk_score', filters.risk_score)
+      }
+      
+      // Filter by XML generation status
+      if (filters.xmlGenerated === 'yes') {
+        query = query.not('xml_generated_at', 'is', null)
+      } else if (filters.xmlGenerated === 'no') {
+        query = query.is('xml_generated_at', null)
       }
       
       // Get total count before pagination (with same filters)
@@ -363,11 +306,29 @@ export const transactionService = {
       if (filters.dateTo) {
         countQuery = countQuery.lte('transaction_date', filters.dateTo);
       }
-      if (filters.status) {
+      // Handle status filter for count query
+      if (filters.statusFilter && Array.isArray(filters.statusFilter) && filters.statusFilter.length > 0) {
+        // Use 'or' filter for multiple statuses to ensure we get all matches
+        if (filters.statusFilter.length === 1) {
+          countQuery = countQuery.eq('status', filters.statusFilter[0]);
+        } else {
+          // Build or filter: status = 'Approved' OR status = 'Rejected'
+          // Supabase or syntax: "status.eq.Approved,status.eq.Rejected"
+          const orConditions = filters.statusFilter.map(status => `status.eq.${status}`).join(',');
+          countQuery = countQuery.or(orConditions);
+        }
+      } else if (filters.status) {
         countQuery = countQuery.eq('status', filters.status);
       }
       if (filters.risk_score) {
         countQuery = countQuery.gte('risk_score', filters.risk_score);
+      }
+      
+      // Filter by XML generation status for count
+      if (filters.xmlGenerated === 'yes') {
+        countQuery = countQuery.not('xml_generated_at', 'is', null)
+      } else if (filters.xmlGenerated === 'no') {
+        countQuery = countQuery.is('xml_generated_at', null)
       }
       
       const { count: totalCount } = await countQuery;
@@ -479,26 +440,29 @@ export const transactionService = {
   // Update transaction
   updateTransaction: async (id, updateData) => {
     try {
-      const user = await getCurrentUser()
-      
+      // Note: transactions table doesn't have updated_by column, only created_by
       const updatePayload = {
         ...updateData,
-        updated_by: user.id,
         updated_at: new Date().toISOString()
       }
       
-      // Recalculate risk score if transaction data changed
-      if (updateData.risk_score === undefined) {
-        const transaction = await transactionService.getTransactionById(id)
-        const riskScore = calculateTransactionRisk({ ...transaction, ...updateData })
-        const status = riskScore > 50 ? 'Flagged' : 'Normal'
-        updatePayload.risk_score = riskScore
-        updatePayload.status = status
+      const { data, error } = await supabase
+        .from('transactions')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('Error updating transaction:', error)
+        throw new Error(error.message || 'Failed to update transaction')
       }
       
-      return await dbHelpers.update('transactions', id, updatePayload)
+      return { success: true, data }
     } catch (error) {
+      console.error('Error updating transaction:', error)
       handleSupabaseError(error)
+      throw error
     }
   },
 
@@ -512,7 +476,6 @@ export const transactionService = {
         flag_reason: reason,
         flagged_by: user.id,
         flagged_at: new Date().toISOString(),
-        updated_by: user.id,
         updated_at: new Date().toISOString()
       }
       
@@ -546,7 +509,6 @@ export const transactionService = {
         block_reason: reason,
         blocked_by: user.id,
         blocked_at: new Date().toISOString(),
-        updated_by: user.id,
         updated_at: new Date().toISOString()
       }
       
@@ -789,6 +751,102 @@ export const transactionService = {
       
     } catch (error) {
       console.error('Error creating alerts for existing transactions:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  // Save XML to history
+  saveXmlHistory: async (transactionId, xmlContent, notes = '') => {
+    try {
+      const user = await getCurrentUser()
+      
+      // Get the latest version number for this transaction
+      const { data: latestVersion, error: versionError } = await supabase
+        .from('transaction_xml_history')
+        .select('version_number')
+        .eq('transaction_id', transactionId)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .single()
+      
+      const nextVersion = latestVersion ? latestVersion.version_number + 1 : 1
+      
+      const { data, error } = await supabase
+        .from('transaction_xml_history')
+        .insert({
+          transaction_id: transactionId,
+          xml_content: xmlContent,
+          generated_by: user.id,
+          version_number: nextVersion,
+          notes: notes || `XML generated - Version ${nextVersion}`
+        })
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('Error saving XML history:', error)
+        return { success: false, error: error.message }
+      }
+      
+      return { success: true, data }
+    } catch (error) {
+      console.error('Error saving XML history:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  // Get XML history for a transaction
+  getXmlHistory: async (transactionId) => {
+    try {
+      const { data, error } = await supabase
+        .from('transaction_xml_history')
+        .select(`
+          *,
+          generated_by_user:users!transaction_xml_history_generated_by_fkey (
+            id,
+            email,
+            first_name,
+            last_name
+          )
+        `)
+        .eq('transaction_id', transactionId)
+        .order('version_number', { ascending: false })
+      
+      if (error) {
+        console.error('Error fetching XML history:', error)
+        return { success: false, error: error.message }
+      }
+      
+      return { success: true, data: data || [] }
+    } catch (error) {
+      console.error('Error fetching XML history:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  // Get latest XML for a transaction
+  getLatestXml: async (transactionId) => {
+    try {
+      const { data, error } = await supabase
+        .from('transaction_xml_history')
+        .select('*')
+        .eq('transaction_id', transactionId)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No XML found
+          return { success: true, data: null }
+        }
+        console.error('Error fetching latest XML:', error)
+        return { success: false, error: error.message }
+      }
+      
+      return { success: true, data }
+    } catch (error) {
+      console.error('Error fetching latest XML:', error)
       return { success: false, error: error.message }
     }
   }
