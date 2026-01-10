@@ -1,27 +1,50 @@
 import { supabase, handleSupabaseError, getCurrentUser, dbHelpers } from '../config/supabase'
 
 export const riskService = {
-  // Get risk rules (from file-based system)
-  getRiskRules: async () => {
+  // Get risk rules (from database)
+  getRiskRules: async (ruleType = null) => {
     try {
       // Load categories and rules from database
-      const { data: categories, error: categoriesError } = await supabase
+      let categoriesQuery = supabase
         .from('risk_categories')
         .select('*')
+      
+      // Filter by rule_type if provided
+      if (ruleType) {
+        categoriesQuery = categoriesQuery.eq('rule_type', ruleType)
+      }
+
+      const { data: categories, error: categoriesError } = await categoriesQuery
 
       if (categoriesError) throw categoriesError
 
-      // Fetch all rules with pagination (Supabase default limit is 1000)
+      // If no categories found for this rule type, return empty
+      if (!categories || categories.length === 0) {
+        return {
+          success: true,
+          rules: [],
+          categories: [],
+          total: 0,
+        }
+      }
+
+      // Get category IDs to filter rules
+      const categoryIds = categories.map(cat => cat.id)
+
+      // Fetch rules filtered by category IDs (only rules belonging to these categories)
       let allRules = []
       let from = 0
       const pageSize = 1000
       let hasMore = true
 
       while (hasMore) {
-        const { data: rulesPage, error: rulesError } = await supabase
+        let rulesQuery = supabase
           .from('risk_rules')
           .select('*')
+          .in('category_id', categoryIds)
           .range(from, from + pageSize - 1)
+
+        const { data: rulesPage, error: rulesError } = await rulesQuery
 
         if (rulesError) throw rulesError
 

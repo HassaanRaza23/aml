@@ -1046,3 +1046,54 @@
 		"MANUFACTURING",
 
 	</select>
+
+
+
+
+	<select name="ctl00$mainPanel$cmb_parameter" id="ctl00_mainPanel_cmb_parameter" class="inputText" required="">
+Any
+High Risk Country
+High Risk Nationality
+Cash Payment
+Id Expired
+Sanction Match
+High Risk Business Activity / Profession
+High Risk
+Match in UN List or Local List
+Non Resident
+Done By High Risk  Nationality
+High Value Cash Transaction - Individual
+High Value Cash Transaction - Corporate
+High Value Cumulative - Individual 30 Days
+High Value Cumulative - Corporate 30 Days
+High Value Cumulative - Individual 90 Days
+High Value Cumulative - Corporate 90 Days
+Transaction Count Individual
+Transaction Count Corporate
+Customer Red Flagged
+Splitting of Transactions
+Gold Exchange Above Limit 
+PEP/FPEP Individual Transactions
+PEP/FPEP UBO Transactions
+Below the Radar
+Purpose Of Txn - Gift
+Customers Reported - STR\ISTR
+Customer in Internal Watchlist
+
+</select>
+
+<select name="ctl00$mainPanel$cmbThresholdFilterType" onchange="javascript:setTimeout('__doPostBack(\'ctl00$mainPanel$cmbThresholdFilterType\',\'\')', 0)" id="ctl00_mainPanel_cmbThresholdFilterType" class="inputText" required="">
+Equal to
+Not Equal to
+Greater Than
+Less Than
+Greater Than or Equal to
+Less Than or Equal to
+Each Transaction Equal to
+Each Transaction Not Equal to
+Each Transaction Greater Than
+Each Transaction Less Than
+Each Transaction Greater Than or Equal to
+Each Transaction Less Than or Equal to
+
+</select>

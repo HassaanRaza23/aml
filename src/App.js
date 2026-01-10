@@ -39,6 +39,7 @@ import RiskAssessment from './pages/Risk/RiskAssessment';
 import RiskRules from './pages/Risk/RiskRules';
 import RiskModels from './pages/Risk/RiskModels';
 import RiskProfile2 from './pages/Risk/RiskProfile2';
+import TransactionActivityRules from './pages/Risk/TransactionActivityRules';
 
 // Case Management
 import CaseList from './pages/CaseManagement/CaseList';
@@ -105,6 +106,7 @@ const App = () => {
                 <Route path="risk/assessment" element={<RiskAssessment />} />
                 <Route path="risk/rules" element={<RiskRules />} />
                 <Route path="risk/models" element={<RiskModels />} />
+                <Route path="risk/transaction-activity-rules" element={<TransactionActivityRules />} />
                 <Route path="/risk-profile/:id" element={<RiskProfile2 />} />
 
 

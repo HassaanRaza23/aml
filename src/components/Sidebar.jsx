@@ -31,7 +31,7 @@ const menu = [
       { title: 'Add Transactions', path: '/transactions/addtransactions' },
       { title: 'Transaction Approvals', path: '/transactions/approvals' },
       { title: 'Reports', path: '/transactions/reports' },
-      { title: 'XML Report Format', path: '/transactions/xml-report' },
+      { title: 'XML Report Generation', path: '/transactions/xml-report' },
       // { title: 'Transaction Rules', path: '/transactions/transactionrules' },
     ],
   },
@@ -40,6 +40,7 @@ const menu = [
     subMenu: [
       { title: 'Risk Assessment', path: '/risk/assessment' },
       { title: 'Risk Rules', path: '/risk/rules' },
+      { title: 'Transaction Activity Rules', path: '/risk/transaction-activity-rules' },
       // { title: 'Risk Models', path: '/risk/models' },
     ],
   },

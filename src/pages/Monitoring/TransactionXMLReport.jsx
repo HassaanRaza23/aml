@@ -513,7 +513,7 @@ ${reportIndicators}
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">XML Report Format (GoAML)</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">XML Report Generation (GoAML)</h1>
           <p className="text-gray-600 mt-1">
             {totalCount} approved transaction{totalCount !== 1 ? 's' : ''} available for XML export
           </p>

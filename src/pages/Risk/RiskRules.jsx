@@ -9,7 +9,7 @@ const RiskRules = () => {
   const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState("name"); // 'name' | 'category' | 'score' | 'logic' | 'status'
   const [sortDirection, setSortDirection] = useState("asc"); // 'asc' | 'desc'
-  const [ruleType, setRuleType] = useState("ONBOARDING"); // 'ONBOARDING' | 'TRANSACTION_PROFILE' | 'TRANSACTION_EVENT'
+  const [ruleType, setRuleType] = useState("ONBOARDING"); // 'ONBOARDING' | 'TRANSACTION'
   const [showFilters, setShowFilters] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -42,7 +42,10 @@ const RiskRules = () => {
     const loadRules = async () => {
       try {
         setLoading(true);
-        const result = await riskService.getRiskRules();
+        // Map ruleType to what the service expects
+        const ruleTypeForService = ruleType === "ONBOARDING" ? "ONBOARDING" : 
+                                   ruleType === "TRANSACTION" ? "TRANSACTION" : null;
+        const result = await riskService.getRiskRules(ruleTypeForService);
         if (result.success) {
           setRules(result.rules || []);
           setCategories(result.categories || []);
@@ -58,17 +61,11 @@ const RiskRules = () => {
     };
 
     loadRules();
-  }, []);
+  }, [ruleType]);
 
   const filteredAndSortedRules = useMemo(() => {
+    // Rules are already filtered by rule type from the service, so we can skip this filter
     let filtered = rules;
-
-    // Filter by selected rule type (for future extensibility)
-    if (ruleType) {
-      filtered = filtered.filter(
-        (rule) => !rule.categoryRuleType || rule.categoryRuleType === ruleType
-      );
-    }
 
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -225,7 +222,10 @@ const RiskRules = () => {
           <div className="inline-flex rounded-md shadow-sm border border-gray-200 bg-white">
             <button
               type="button"
-              onClick={() => setRuleType("ONBOARDING")}
+              onClick={() => {
+                setRuleType("ONBOARDING");
+                setCurrentPage(1); // Reset to first page when switching tabs
+              }}
               className={`px-4 py-1.5 text-sm font-medium border-r border-gray-200 ${
                 ruleType === "ONBOARDING"
                   ? "bg-blue-50 text-blue-700"
@@ -236,25 +236,17 @@ const RiskRules = () => {
             </button>
             <button
               type="button"
-              onClick={() => setRuleType("TRANSACTION_PROFILE")}
-              className={`px-4 py-1.5 text-sm font-medium border-r border-gray-200 ${
-                ruleType === "TRANSACTION_PROFILE"
+              onClick={() => {
+                setRuleType("TRANSACTION");
+                setCurrentPage(1); // Reset to first page when switching tabs
+              }}
+              className={`px-4 py-1.5 text-sm font-medium ${
+                ruleType === "TRANSACTION"
                   ? "bg-blue-50 text-blue-700"
                   : "text-gray-600 hover:bg-gray-50"
               }`}
             >
               Transaction
-            </button>
-            <button
-              type="button"
-              onClick={() => setRuleType("TRANSACTION_EVENT")}
-              className={`px-4 py-1.5 text-sm font-medium ${
-                ruleType === "TRANSACTION_EVENT"
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              Event
             </button>
           </div>
         </div>
@@ -937,8 +929,12 @@ const RiskRules = () => {
                   Rule Name
                   {renderSortIcon("name")}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  onClick={() => toggleSort("category")}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                >
                   Category
+                  {renderSortIcon("category")}
                 </th>
                 <th
                   onClick={() => toggleSort("score")}

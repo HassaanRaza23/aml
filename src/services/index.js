@@ -9,6 +9,7 @@ export { alertService } from './alertService';
 export { dashboardService } from './dashboardService';
 export { userService } from './userService';
 export { verificationService } from './verificationService';
+export { transactionActivityRuleService } from './transactionActivityRuleService';
 
 
 // Example usage:
