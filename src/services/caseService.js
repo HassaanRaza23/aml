@@ -65,25 +65,18 @@ export const caseService = {
   // Get cases with filtering and pagination
   getCases: async (page = 1, limit = 50, filters = {}) => {
     try {
+      // Fetch cases without join first (to avoid foreign key issues)
       let query = supabase
         .from('cases')
-        .select(`
-          *,
-          customers (
-            id,
-            first_name,
-            last_name,
-            email
-          )
-        `)
+        .select('*')
       
       // Add filters
       if (filters.status) {
         query = query.eq('status', filters.status)
       }
       
-      if (filters.risk_level) {
-        query = query.eq('risk_level', filters.risk_level)
+      if (filters.priority) {
+        query = query.eq('priority', filters.priority)
       }
       
       if (filters.case_type) {
@@ -112,10 +105,66 @@ export const caseService = {
       
       const { data: cases, error, count } = await query
       
-      if (error) handleSupabaseError(error)
-      return { data: cases, count }
+      if (error) {
+        console.error('Supabase error in getCases:', error);
+        handleSupabaseError(error);
+        return { data: null, error: error.message || 'Failed to fetch cases', count: 0 };
+      }
+
+      // Fetch customer details separately for cases that have customer_id
+      if (cases && cases.length > 0) {
+        const customerIds = cases
+          .map(c => c.customer_id)
+          .filter(id => id !== null && id !== undefined);
+        
+        if (customerIds.length > 0) {
+          try {
+            // Fetch customers and their natural person details
+            const { data: customers, error: customerError } = await supabase
+              .from('customers')
+              .select(`
+                id,
+                email,
+                customer_type,
+                natural_person_details (
+                  firstname,
+                  lastname
+                )
+              `)
+              .in('id', customerIds);
+
+            if (!customerError && customers) {
+              // Map customer data to cases
+              const customerMap = {};
+              customers.forEach(customer => {
+                customerMap[customer.id] = {
+                  id: customer.id,
+                  email: customer.email,
+                  customer_type: customer.customer_type,
+                  first_name: customer.natural_person_details?.[0]?.firstname || null,
+                  last_name: customer.natural_person_details?.[0]?.lastname || null
+                };
+              });
+
+              // Attach customer data to cases
+              cases.forEach(caseItem => {
+                if (caseItem.customer_id && customerMap[caseItem.customer_id]) {
+                  caseItem.customers = customerMap[caseItem.customer_id];
+                }
+              });
+            }
+          } catch (customerErr) {
+            console.warn('Error fetching customer details:', customerErr);
+            // Continue without customer details
+          }
+        }
+      }
+
+      return { data: cases || [], count: count || 0 }
     } catch (error) {
-      handleSupabaseError(error)
+      console.error('Error in getCases:', error);
+      handleSupabaseError(error);
+      return { data: null, error: error.message || 'Failed to fetch cases', count: 0 };
     }
   },
 
@@ -302,9 +351,20 @@ export const caseService = {
   // Get case statistics
   getCaseStats: async () => {
     try {
-      const { data: cases } = await supabase
+      const { data: cases, error } = await supabase
         .from('cases')
         .select('*')
+      
+      if (error) {
+        console.error('Error fetching case stats:', error);
+        // Return default stats if there's an error
+        return {
+          total: 0,
+          byStatus: { Open: 0, 'In Progress': 0, Resolved: 0, Closed: 0 },
+          byRiskLevel: { Low: 0, Medium: 0, High: 0 },
+          byType: { Screening: 0, Transaction: 0, KYC: 0 }
+        };
+      }
       
       const stats = {
         total: cases?.length || 0,
@@ -315,9 +375,9 @@ export const caseService = {
           Closed: cases?.filter(c => c.status === 'Closed').length || 0
         },
         byRiskLevel: {
-          Low: cases?.filter(c => c.risk_level === 'Low').length || 0,
-          Medium: cases?.filter(c => c.risk_level === 'Medium').length || 0,
-          High: cases?.filter(c => c.risk_level === 'High').length || 0
+          Low: cases?.filter(c => c.priority === 'Low').length || 0,
+          Medium: cases?.filter(c => c.priority === 'Medium').length || 0,
+          High: cases?.filter(c => c.priority === 'High' || c.priority === 'Critical').length || 0
         },
         byType: {
           Screening: cases?.filter(c => c.case_type === 'Screening').length || 0,
@@ -329,7 +389,15 @@ export const caseService = {
       
       return stats
     } catch (error) {
-      handleSupabaseError(error)
+      console.error('Error in getCaseStats:', error);
+      handleSupabaseError(error);
+      // Return default stats on error
+      return {
+        total: 0,
+        byStatus: { Open: 0, 'In Progress': 0, Resolved: 0, Closed: 0 },
+        byRiskLevel: { Low: 0, Medium: 0, High: 0 },
+        byType: { Screening: 0, Transaction: 0, KYC: 0 }
+      };
     }
   },
 

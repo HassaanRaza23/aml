@@ -38,7 +38,7 @@ const menu = [
   {
     title: 'Risk',
     subMenu: [
-      { title: 'Risk Assessment', path: '/risk/assessment' },
+      // { title: 'Risk Assessment', path: '/risk/assessment' },
       { title: 'Risk Rules', path: '/risk/rules' },
       { title: 'Transaction Activity Rules', path: '/risk/transaction-activity-rules' },
       // { title: 'Risk Models', path: '/risk/models' },
@@ -47,7 +47,7 @@ const menu = [
   {
     title: 'Case Management',
     subMenu: [
-      { title: 'Case List', path: '/cases/list' },
+      { title: 'Cases', path: '/cases/list' },
       { title: 'Case Details', path: '/cases/details' },
       // { title: 'Assign Case', path: '/cases/assign' },
       { title: 'Case Actions', path: '/cases/actions' },
